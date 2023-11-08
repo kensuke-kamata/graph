@@ -1,6 +1,6 @@
-# Rondo Graph Library (`rondo::graph`)
+# `rondo::graph`
 
-The Rondo Graph Library (`rondo::graph`) is a header-only C++ library for creating and manipulating graphs. It leverages modern C++17 features and the popular `nlohmann::json` library for JSON serialization and deserialization of graph structures.
+The Rondo Graph Library, `rondo::graph`, is a header-only C++ library for creating and manipulating graphs. It leverages modern C++17 features and the popular `nlohmann::json` library for JSON serialization and deserialization of graph structures.
 
 ## Installation
 
