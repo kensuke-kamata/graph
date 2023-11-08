@@ -7,7 +7,7 @@ project(rondo-graph
 set(CMAKE_CXX_STANDARD 17)
 
 add_library(${PROJECT_NAME} INTERFACE)
-target_include_directories(${PROJECT_NAME} INTERFACE ${CMAKE_SOURCE_DIR})
+target_include_directories(${PROJECT_NAME} INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Use FetchContent
 include(FetchContent)
@@ -21,21 +21,8 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(json)
 target_link_libraries(${PROJECT_NAME} INTERFACE nlohmann_json::nlohmann_json)
 
-# Fetch googletest
-FetchContent_Declare(
-  googletest
-  GIT_REPOSITORY https://github.com/google/googletest.git
-  GIT_TAG release-1.12.1
-)
-FetchContent_MakeAvailable(googletest)
-
-# Setup googletest
-enable_testing()
-set(TEST_PROJECT_NAME test-${PROJECT_NAME})
-set(TEST_FILES ${CMAKE_SOURCE_DIR}/test/test.cpp)
-add_executable(${TEST_PROJECT_NAME} ${TEST_FILES})
-
-target_link_libraries(${TEST_PROJECT_NAME} gtest gtest_main ${PROJECT_NAME})
-
-# Add tests
-add_test(NAME all COMMAND ${TEST_PROJECT_NAME})
+# Add subdirectories
+if(BUILD_RONDO_GRAPH_TEST)
+  enable_testing()
+  add_subdirectory(test)
+endif()
