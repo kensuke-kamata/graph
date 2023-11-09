@@ -24,6 +24,9 @@ class graph {
   using neighbor  = std::pair<vertex, weight>;
   using neighbors = std::vector<neighbor>;
 
+  // A function type that takes a vertex and returns void.
+  using function = std::function<void(vertex &)>;
+
  private:
   std::map<vertex, neighbors> adjacencies = {};
   std::map<vertex, property>  properties  = {};
@@ -188,6 +191,11 @@ class graph {
     return j;
   }
 
+  void dfs(vertex &start, const function &f) {
+    std::map<vertex, bool> visited;
+    dfs_helper(start, visited, f);
+  }
+
  private:
   bool remove_helper(const vertex &from, const vertex &to) {
     bool removed = false;
@@ -202,6 +210,17 @@ class graph {
       removed = true;
     }
     return removed;
+  }
+
+  void dfs_helper(vertex &v, std::map<vertex, bool> &visited, const function &f) {
+    visited[v] = true;
+    f(v);
+
+    for (auto &neighbor : adjacencies[v]) {
+      if (!visited[neighbor.first]) {
+        dfs_helper(neighbor.first, visited, f);
+      }
+    }
   }
 };
 }  // namespace rondo
