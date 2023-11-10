@@ -157,3 +157,57 @@ TEST_F(GraphTest, FromJson) {
   EXPECT_TRUE(g_undirected.has_edge(1, 2));
   EXPECT_DOUBLE_EQ(g_undirected.get_weight(1, 2), 3.5);
 }
+
+TEST_F(GraphTest, DfsTraversal) {
+  auto v1 = g_directed.add_vertex();
+  auto v2 = g_directed.add_vertex();
+  auto v3 = g_directed.add_vertex();
+  auto v4 = g_directed.add_vertex();
+  g_directed.add_edge(v1, v2);
+  g_directed.add_edge(v1, v3);
+  g_directed.add_edge(v2, v4);
+
+  std::vector<rondo::vertex> visited_order;
+  g_directed.dfs(v1, [&visited_order](rondo::vertex &v) {
+    visited_order.push_back(v);
+  });
+
+  std::vector<rondo::vertex> expected_order = {v1, v2, v4, v3};
+  EXPECT_EQ(visited_order, expected_order);
+}
+
+TEST_F(GraphTest, BfsTraversal) {
+  auto v1 = g_directed.add_vertex();
+  auto v2 = g_directed.add_vertex();
+  auto v3 = g_directed.add_vertex();
+  auto v4 = g_directed.add_vertex();
+  g_directed.add_edge(v1, v2);
+  g_directed.add_edge(v1, v3);
+  g_directed.add_edge(v2, v4);
+
+  std::vector<rondo::vertex> visited_order;
+  g_directed.bfs(v1, [&visited_order](rondo::vertex &v) {
+    visited_order.push_back(v);
+  });
+
+  std::vector<rondo::vertex> expected_order = {v1, v2, v3, v4};
+  EXPECT_EQ(visited_order, expected_order);
+}
+
+TEST_F(GraphTest, DijkstraShortestPath) {
+  auto v1 = g_directed.add_vertex();
+  auto v2 = g_directed.add_vertex();
+  auto v3 = g_directed.add_vertex();
+  auto v4 = g_directed.add_vertex();
+  g_directed.add_edge(v1, v2, 1);
+  g_directed.add_edge(v2, v3, 1);
+  g_directed.add_edge(v3, v4, 1);
+  g_directed.add_edge(v1, v4, 10);
+
+  auto result = g_directed.dijkstra(v1);
+
+  std::vector<rondo::vertex> path_to_v4 = result.path_to(v4);
+  std::vector<rondo::vertex> expected_path = {v1, v2, v3, v4};
+  EXPECT_EQ(path_to_v4, expected_path);
+  EXPECT_DOUBLE_EQ(result.distances[v4], 3);
+}
