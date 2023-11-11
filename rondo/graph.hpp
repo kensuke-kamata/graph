@@ -36,6 +36,11 @@ class graph {
   bool directed = false;
 
  public:
+  static vertex null_vertex() {
+    return std::numeric_limits<vertex>::max();
+  }
+
+ public:
   graph(bool directed = false) : directed(directed) {}
 
   void clear() {
@@ -220,7 +225,7 @@ class graph {
     }
   }
 
-  struct dijkstra_result {
+  struct result {
     std::map<vertex, weight> distances    = {};
     std::map<vertex, vertex> predecessors = {};
 
@@ -230,50 +235,78 @@ class graph {
         return path;
       }
       for (auto at = end; at != std::numeric_limits<vertex>::max(); at = predecessors[at]) {
-        path.push_back(at);
+        path.emplace_back(at);
       }
       std::reverse(path.begin(), path.end());
       return path;
     }
   };
 
-  dijkstra_result dijkstra(const vertex &start) {
-    // Min heap to store the vertices along with the current shortest distance.
+  result dijkstra(const vertex &start) {
     std::priority_queue<std::pair<weight, vertex>,
                         std::vector<std::pair<weight, vertex>>,
                         std::greater<std::pair<weight, vertex>>> pq;
 
-    // Initialize the distances and predecessors.
-    dijkstra_result result;
+    result res;
     for (const auto &pair : adjacencies) {
-      result.distances[pair.first]    = std::numeric_limits<weight>::infinity();
-      result.predecessors[pair.first] = std::numeric_limits<vertex>::max();
+      res.distances[pair.first]    = std::numeric_limits<weight>::infinity();
+      res.predecessors[pair.first] = std::numeric_limits<vertex>::max();
     }
 
-    // Set the distance to the start vertex to 0.
-    result.distances[start] = 0;
+    res.distances[start] = 0;
     pq.emplace(0, start);
 
     while (!pq.empty()) {
-      auto [curr_dist, curr_vert] = pq.top();
+      auto [d, u] = pq.top();
       pq.pop();
 
-      if (curr_dist > result.distances[curr_vert]) { continue; }
+      if (d > res.distances[u]) { continue; }
 
-      for (const auto &neighbor : adjacencies[curr_vert]) {
+      for (const auto &neighbor : adjacencies[u]) {
         auto v = neighbor.first;
         auto w = neighbor.second;
-
-        auto dist_via_curr = result.distances[curr_vert] + w;
-
-        if (dist_via_curr < result.distances[v]) {
-          result.distances[v]    = dist_via_curr;
-          result.predecessors[v] = curr_vert;
-          pq.emplace(dist_via_curr, v);
+        auto alt = res.distances[u] + w;
+        if (alt < res.distances[v]) {
+          res.distances[v]    = alt;
+          res.predecessors[v] = u;
+          pq.emplace(alt, v);
         }
       }
     }
-    return result;
+    return res;
+  }
+
+  result bellman_ford(const vertex &start) {
+    result res;
+    for (const auto &pair : adjacencies) {
+      res.distances[pair.first]    = std::numeric_limits<weight>::infinity();
+      res.predecessors[pair.first] = std::numeric_limits<vertex>::max();
+    }
+    res.distances[start] = 0;
+
+    bool updated = true;
+    size_t count = 0;
+    while (updated) {
+      updated = false;
+      for (const auto &pair : adjacencies) {
+        auto u = pair.first;
+        for (const auto &neighbor : adjacencies[u]) {
+          auto v = neighbor.first;
+          auto w = neighbor.second;
+          if (res.distances[u] + w < res.distances[v]) {
+            res.distances[v]    = res.distances[u] + w;
+            res.predecessors[v] = u;
+            updated = true;
+            if (count == adjacencies.size() - 1) {
+              throw std::runtime_error("negative cycle detected");
+            }
+          }
+        }
+      }
+      count++;
+    }
+
+    return res;
   }
 
  private:

@@ -211,3 +211,91 @@ TEST_F(GraphTest, DijkstraShortestPath) {
   EXPECT_EQ(path_to_v4, expected_path);
   EXPECT_DOUBLE_EQ(result.distances[v4], 3);
 }
+
+TEST_F(GraphTest, BellmanFordShortestPath) {
+  // Create a directed graph
+  auto v0 = g_directed.add_vertex();
+  auto v1 = g_directed.add_vertex();
+  auto v2 = g_directed.add_vertex();
+  auto v3 = g_directed.add_vertex();
+  auto v4 = g_directed.add_vertex();
+
+  // Add edges with weights
+  g_directed.add_edge(v0, v1, 6);
+  g_directed.add_edge(v0, v2, 7);
+  g_directed.add_edge(v1, v2, 8);
+  g_directed.add_edge(v1, v3, 5);
+  g_directed.add_edge(v1, v4, -4);
+  g_directed.add_edge(v2, v3, -3);
+  g_directed.add_edge(v2, v4, 9);
+  g_directed.add_edge(v3, v1, -2);
+  g_directed.add_edge(v4, v0, 2);
+  g_directed.add_edge(v4, v3, 7);
+
+  // Compute shortest paths from v0 using Bellman-Ford
+  auto result = g_directed.bellman_ford(v0);
+
+  // Check distances
+  EXPECT_DOUBLE_EQ(result.distances[v0], 0);
+  EXPECT_DOUBLE_EQ(result.distances[v1], 2);
+  EXPECT_DOUBLE_EQ(result.distances[v2], 7);
+  EXPECT_DOUBLE_EQ(result.distances[v3], 4);
+  EXPECT_DOUBLE_EQ(result.distances[v4], -2);
+
+  // Check predecessors
+  EXPECT_EQ(result.predecessors[v0], rondo::graph::null_vertex());
+  EXPECT_EQ(result.predecessors[v1], v3);
+  EXPECT_EQ(result.predecessors[v2], v0);
+  EXPECT_EQ(result.predecessors[v3], v2);
+  EXPECT_EQ(result.predecessors[v4], v1);
+}
+
+TEST_F(GraphTest, BellmanFordEarlyExit) {
+  // Create a directed graph with a cycle
+  auto v0 = g_directed.add_vertex();
+  auto v1 = g_directed.add_vertex();
+  auto v2 = g_directed.add_vertex();
+
+  g_directed.add_edge(v0, v1, 4);
+  g_directed.add_edge(v1, v2, -6);
+  g_directed.add_edge(v2, v0, 3);
+
+  // Compute shortest paths from v0 using Bellman-Ford
+  auto result = g_directed.bellman_ford(v0);
+
+  // Check distances
+  EXPECT_DOUBLE_EQ(result.distances[v0], 0);
+  EXPECT_DOUBLE_EQ(result.distances[v1], 4);
+  EXPECT_DOUBLE_EQ(result.distances[v2], -2);
+
+  // Check predecessors
+  EXPECT_EQ(result.predecessors[v0], rondo::graph::null_vertex());
+  EXPECT_EQ(result.predecessors[v1], v0);
+  EXPECT_EQ(result.predecessors[v2], v1);
+}
+
+TEST_F(GraphTest, BellmanFordNegativeCycle) {
+  // Create a directed graph with a negative cycle
+  auto v0 = g_directed.add_vertex();
+  auto v1 = g_directed.add_vertex();
+  auto v2 = g_directed.add_vertex();
+  auto v3 = g_directed.add_vertex();
+  auto v4 = g_directed.add_vertex();
+  auto v5 = g_directed.add_vertex();
+
+  g_directed.add_edge(v0, v1, 5);
+  g_directed.add_edge(v0, v2, 4);
+  g_directed.add_edge(v1, v2, -2);
+  g_directed.add_edge(v1, v3, 1);
+  g_directed.add_edge(v2, v3, 2);
+  g_directed.add_edge(v2, v4, 1);
+  g_directed.add_edge(v2, v5, 4);
+  g_directed.add_edge(v3, v1, -1);
+  g_directed.add_edge(v3, v5, 3);
+  g_directed.add_edge(v4, v5, 4);
+
+  // Compute shortest paths from v0 using Bellman-Ford
+  EXPECT_THROW({
+    g_directed.bellman_ford(v0);
+  }, std::runtime_error);
+}
