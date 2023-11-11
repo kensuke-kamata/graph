@@ -284,28 +284,25 @@ class graph {
     }
     res.distances[start] = 0;
 
-    bool updated = true;
-    size_t count = 0;
-    while (updated) {
-      updated = false;
+    for (size_t i = 0; i < adjacencies.size(); i++) {
+      auto updated = false;
       for (const auto &pair : adjacencies) {
         auto u = pair.first;
-        for (const auto &neighbor : adjacencies[u]) {
+        for (const auto &neighbor : pair.second) {
           auto v = neighbor.first;
           auto w = neighbor.second;
           if (res.distances[u] + w < res.distances[v]) {
             res.distances[v]    = res.distances[u] + w;
             res.predecessors[v] = u;
             updated = true;
-            if (count == adjacencies.size() - 1) {
-              throw std::runtime_error("negative cycle detected");
-            }
           }
         }
       }
-      count++;
+      if (!updated) { break; }
+      if (i == adjacencies.size() - 1 && updated) {
+        throw std::runtime_error("negative cycle detected");
+      }
     }
-
     return res;
   }
 
