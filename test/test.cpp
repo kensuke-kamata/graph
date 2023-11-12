@@ -34,7 +34,6 @@ class GraphTest : public ::testing::Test {
       throw std::runtime_error("path exists but not a directory: " + path);
     }
 }
-
 };
 
 TEST_F(GraphTest, Init) {
@@ -92,9 +91,9 @@ TEST_F(GraphTest, GetNeighbors) {
   auto v2 = g_undirected.add_vertex();
   g_undirected.add_edge(v1, v2);
 
-  auto neighbors = g_undirected.get_neighbors(v1);
-  EXPECT_EQ(neighbors.size(), 1);
-  EXPECT_EQ(neighbors[0].first, v2);
+  auto edges = g_undirected.get_edges(v1);
+  EXPECT_EQ(edges.size(), 1);
+  EXPECT_EQ(edges[0].first, v2);
 }
 
 TEST_F(GraphTest, GetWeight) {
@@ -102,8 +101,9 @@ TEST_F(GraphTest, GetWeight) {
   auto v2 = g_undirected.add_vertex();
   g_undirected.add_edge(v1, v2, 2.5);
 
-  rondo::weight w = g_undirected.get_weight(v1, v2);
-  EXPECT_DOUBLE_EQ(w, 2.5);
+  auto result = g_undirected.get_weight(v1, v2);
+  EXPECT_TRUE(result.has_value());
+  EXPECT_DOUBLE_EQ(result.value(), 2.5);
 }
 
 TEST_F(GraphTest, SetProperty) {
@@ -124,7 +124,7 @@ TEST_F(GraphTest, ToJson) {
   auto json = g_undirected.to_json();
 
   EXPECT_EQ(json["directed"], false);
-  EXPECT_EQ(json["nodes"].size(), 2);
+  EXPECT_EQ(json["vertices"].size(), 2);
   EXPECT_EQ(json["edges"].size(), 2); // Since it's undirected, there should be two edges (v1-v2 and v2-v1)
 
   // ... more checks if needed
@@ -134,7 +134,7 @@ TEST_F(GraphTest, FromJson) {
   std::string json_content = R"(
   {
     "directed": false,
-    "nodes": [
+    "vertices": [
         {"id": 1, "label": "node1", "color": "red"},
         {"id": 2, "label": "node2", "color": "blue"}
     ],
@@ -155,7 +155,7 @@ TEST_F(GraphTest, FromJson) {
   // Perform checks to ensure the graph loaded correctly
   EXPECT_EQ(g_undirected.size(), 2);
   EXPECT_TRUE(g_undirected.has_edge(1, 2));
-  EXPECT_DOUBLE_EQ(g_undirected.get_weight(1, 2), 3.5);
+  EXPECT_DOUBLE_EQ(g_undirected.get_weight(1, 2).value(), 3.5);
 }
 
 TEST_F(GraphTest, DfsTraversal) {
@@ -167,12 +167,12 @@ TEST_F(GraphTest, DfsTraversal) {
   g_directed.add_edge(v1, v3);
   g_directed.add_edge(v2, v4);
 
-  std::vector<rondo::vertex> visited_order;
-  g_directed.dfs(v1, [&visited_order](rondo::vertex &v) {
+  std::vector<rondo::graph::vertex> visited_order;
+  g_directed.dfs(v1, [&visited_order](rondo::graph::vertex &v) {
     visited_order.push_back(v);
   });
 
-  std::vector<rondo::vertex> expected_order = {v1, v2, v4, v3};
+  std::vector<rondo::graph::vertex> expected_order = {v1, v2, v4, v3};
   EXPECT_EQ(visited_order, expected_order);
 }
 
@@ -185,12 +185,12 @@ TEST_F(GraphTest, BfsTraversal) {
   g_directed.add_edge(v1, v3);
   g_directed.add_edge(v2, v4);
 
-  std::vector<rondo::vertex> visited_order;
-  g_directed.bfs(v1, [&visited_order](rondo::vertex &v) {
+  std::vector<rondo::graph::vertex> visited_order;
+  g_directed.bfs(v1, [&visited_order](rondo::graph::vertex &v) {
     visited_order.push_back(v);
   });
 
-  std::vector<rondo::vertex> expected_order = {v1, v2, v3, v4};
+  std::vector<rondo::graph::vertex> expected_order = {v1, v2, v3, v4};
   EXPECT_EQ(visited_order, expected_order);
 }
 
@@ -206,8 +206,8 @@ TEST_F(GraphTest, DijkstraShortestPath) {
 
   auto result = g_directed.dijkstra(v1);
 
-  std::vector<rondo::vertex> path_to_v4 = result.path_to(v4);
-  std::vector<rondo::vertex> expected_path = {v1, v2, v3, v4};
+  std::vector<rondo::graph::vertex> path_to_v4 = result.path_to(v4);
+  std::vector<rondo::graph::vertex> expected_path = {v1, v2, v3, v4};
   EXPECT_EQ(path_to_v4, expected_path);
   EXPECT_DOUBLE_EQ(result.distances[v4], 3);
 }
@@ -243,7 +243,7 @@ TEST_F(GraphTest, BellmanFordShortestPath) {
   EXPECT_DOUBLE_EQ(result.distances[v4], -2);
 
   // Check predecessors
-  EXPECT_EQ(result.predecessors[v0], rondo::graph::null_vertex());
+  EXPECT_EQ(result.predecessors[v0], rondo::graph::VERTEX_END);
   EXPECT_EQ(result.predecessors[v1], v3);
   EXPECT_EQ(result.predecessors[v2], v0);
   EXPECT_EQ(result.predecessors[v3], v2);
@@ -269,7 +269,7 @@ TEST_F(GraphTest, BellmanFordEarlyExit) {
   EXPECT_DOUBLE_EQ(result.distances[v2], -2);
 
   // Check predecessors
-  EXPECT_EQ(result.predecessors[v0], rondo::graph::null_vertex());
+  EXPECT_EQ(result.predecessors[v0], rondo::graph::VERTEX_END);
   EXPECT_EQ(result.predecessors[v1], v0);
   EXPECT_EQ(result.predecessors[v2], v1);
 }
@@ -298,4 +298,99 @@ TEST_F(GraphTest, BellmanFordNegativeCycle) {
   EXPECT_THROW({
     g_directed.bellman_ford(v0);
   }, std::runtime_error);
+}
+
+TEST_F(GraphTest, FloydWarshallZeroEdges) {
+  auto v0 = g_directed.add_vertex();
+  auto v1 = g_directed.add_vertex();
+
+  auto result = g_directed.floyd_warshall();
+  EXPECT_FALSE(result.distance(v0, v1).has_value());
+}
+
+TEST_F(GraphTest, FloydWarshallSelfLoop) {
+  auto v0 = g_directed.add_vertex();
+  g_directed.add_edge(v0, v0, 1);
+
+  auto result = g_directed.floyd_warshall();
+  EXPECT_DOUBLE_EQ(result.distance(v0, v0).value(), 0);
+
+  std::vector<rondo::graph::vertex> expect = {v0};
+  EXPECT_EQ(result.path(v0, v0), expect);
+}
+
+TEST_F(GraphTest, FloydWarshallMaximumWeight) {
+  auto v0 = g_directed.add_vertex();
+  auto v1 = g_directed.add_vertex();
+  g_directed.add_edge(v0, v1, rondo::graph::WEIGHT_INF);
+
+  auto result = g_directed.floyd_warshall();
+  EXPECT_DOUBLE_EQ(result.distance(v0, v1).value(), rondo::graph::WEIGHT_INF);
+}
+
+TEST_F(GraphTest, FloydWarshallSingleVertex) {
+  auto v0 = g_directed.add_vertex();
+
+  auto result = g_directed.floyd_warshall();
+  EXPECT_DOUBLE_EQ(result.distance(v0, v0).value(), 0);
+}
+
+TEST_F(GraphTest, FloydWarshallDisconnectedGraph) {
+  auto v0 = g_directed.add_vertex();
+  auto v1 = g_directed.add_vertex();
+  g_directed.add_edge(v0, v1, 1.0);
+
+  auto result = g_directed.floyd_warshall();
+  EXPECT_TRUE(result.distance(v0, v1).has_value());
+  EXPECT_FALSE(result.distance(v1, v0).has_value());
+  EXPECT_TRUE(result.path(v1, v0).empty());
+}
+
+TEST_F(GraphTest, FloydWarshallNegativeCycleTwoVertices) {
+  auto v0 = g_directed.add_vertex();
+  auto v1 = g_directed.add_vertex();
+
+  g_directed .add_edge(v0, v1, 1);
+  g_directed .add_edge(v1, v0, -2);
+  EXPECT_THROW({
+    g_directed.floyd_warshall();
+  }, std::runtime_error);
+}
+
+TEST_F(GraphTest, FloydWarshallNegativeCycleBasic) {
+  auto v0 = g_directed.add_vertex();
+  auto v1 = g_directed.add_vertex();
+  auto v2 = g_directed.add_vertex();
+
+  g_directed .add_edge(v0, v1, 2);
+  g_directed .add_edge(v1, v2, 3);
+  g_directed .add_edge(v2, v1, -6);
+  EXPECT_THROW({
+    g_directed.floyd_warshall();
+  }, std::runtime_error);
+}
+
+TEST_F(GraphTest, FloydWarshall) {
+  auto v0 = g_directed.add_vertex();
+  auto v1 = g_directed.add_vertex();
+  auto v2 = g_directed.add_vertex();
+  auto v3 = g_directed.add_vertex();
+  auto v4 = g_directed.add_vertex();
+  auto v5 = g_directed.add_vertex();
+
+  g_directed.add_edge(v0, v1, 6);
+  g_directed.add_edge(v0, v2, 4);
+  g_directed.add_edge(v2, v3, 3);
+  g_directed.add_edge(v3, v4, -1);
+  g_directed.add_edge(v4, v5, -2);
+  g_directed.add_edge(v5, v1, 1);
+
+  auto result = g_directed.floyd_warshall();
+
+  // dist.at(from).at(to)
+  EXPECT_DOUBLE_EQ(result.distance(v0, v0).value(), 0);
+  EXPECT_DOUBLE_EQ(result.distance(v0, v1).value(), 5);
+
+  std::vector<rondo::graph::vertex> expect = {v0, v2, v3, v4, v5, v1};
+  EXPECT_EQ(result.path(v0, v1), expect);
 }

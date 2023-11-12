@@ -5,16 +5,26 @@
 #include <fstream>
 #include <limits>
 #include <map>
+#include <optional>
 #include <queue>
 #include <string>
 #include <vector>
 
 namespace rondo {
-using vertex = size_t;
-using weight = double_t;
-
 class graph {
  public:
+  using vertex   = size_t;
+  using weight   = double_t;
+  using edge     = std::pair<vertex, weight>;
+  using edges    = std::vector<edge>;
+  using function = std::function<void(vertex &)>;
+
+  template <typename T>
+  using matrix = std::map<vertex, std::map<vertex, T>>;
+
+  static constexpr vertex VERTEX_END = std::numeric_limits<vertex>::max();
+  static constexpr weight WEIGHT_INF = std::numeric_limits<weight>::infinity();
+
   struct property {
     std::string label = "";
     std::string color = "";
@@ -23,69 +33,57 @@ class graph {
       : label(label), color(color) {}
   };
 
-  using neighbor  = std::pair<vertex, weight>;
-  using neighbors = std::vector<neighbor>;
-
-  // A function type that takes a vertex and returns void.
-  using function = std::function<void(vertex &)>;
-
  private:
-  std::map<vertex, neighbors> adjacencies = {};
-  std::map<vertex, property>  properties  = {};
-  vertex next = std::numeric_limits<vertex>::max();
+  std::map<vertex, edges>    vertices   = {};
+  std::map<vertex, property> properties = {};
+  vertex next = VERTEX_END;
   bool directed = false;
-
- public:
-  static vertex null_vertex() {
-    return std::numeric_limits<vertex>::max();
-  }
 
  public:
   graph(bool directed = false) : directed(directed) {}
 
   void clear() {
-    adjacencies.clear();
+    vertices.clear();
     properties.clear();
-    next = std::numeric_limits<vertex>::max();
+    next = VERTEX_END;
   }
 
   size_t size() const {
-    return adjacencies.size();
+    return vertices.size();
   }
 
   bool empty() const {
-    return adjacencies.empty();
+    return vertices.empty();
   }
 
-  const neighbors &operator[](const vertex &v) const {
-    return adjacencies.at(v);
+  const edges &operator[](const vertex &v) const {
+    return vertices.at(v);
   }
 
   const property &operator()(const vertex &v) const {
     return properties.at(v);
   }
 
-  const neighbors &get_neighbors(const vertex &v) const {
-    return adjacencies.at(v);
+  const edges &get_edges(const vertex &v) const {
+    return vertices.at(v);
   }
 
   const property &get_property(const vertex &v) const {
     return properties.at(v);
   }
 
-  weight get_weight(const vertex &from, const vertex &to) const {
-    if (adjacencies.find(from) == adjacencies.end()) {
-      throw std::runtime_error("vertex: " + std::to_string(from) + " not found");
+  std::optional<weight> get_weight(const vertex &from, const vertex &to) const {
+    auto it = vertices.find(from);
+    if (it == vertices.end()) {
+      return std::nullopt;
     }
-    auto &neighbors = adjacencies.at(from);
-    auto it = std::find_if(neighbors.begin(), neighbors.end(),
-                          [&to](const neighbor &n) {
-      return n.first == to;
-    });
-    if (it == neighbors.end()) {
-      throw std::runtime_error("edge: " + std::to_string(from) + " -> " + std::to_string(to) + " not found");
+    auto &edges = it->second;
+    for (const auto &edge : edges) {
+      if (edge.first == to) {
+        return edge.second;
+      }
     }
-    return it->second;
+    return  std::nullopt;
   }
 
   void set_property(const vertex &v, const property &p) {
@@ -95,46 +93,46 @@ class graph {
   }
 
   bool has_edge(const vertex &from, const vertex &to) const {
-    if (adjacencies.find(from) == adjacencies.end()) {
+    if (vertices.find(from) == vertices.end()) {
       return false;
     }
-    auto &neighbors = adjacencies.at(from);
-    auto it = std::find_if(neighbors.begin(), neighbors.end(),
-                          [&to](const neighbor &n) {
-      return n.first == to;
+    auto &edges = vertices.at(from);
+    auto it = std::find_if(edges.begin(), edges.end(),
+                          [&to](const edge &e) {
+      return e.first == to;
     });
-    return it != neighbors.end();
+    return it != edges.end();
   }
 
   vertex add_vertex(const property &p = property()) {
     next++;
-    if (next == std::numeric_limits<vertex>::max()) {
+    if (next == VERTEX_END) {
       throw std::runtime_error("vertex: overflow");
     }
-    adjacencies[next] = {};
-    properties[next]  = p;
+    vertices[next]   = {};
+    properties[next] = p;
     return next;
   }
 
   vertex add_vertex(const vertex &v, const property &p = property()) {
-    if (adjacencies.find(v) != adjacencies.end()) {
-      properties[v] = p;
+    if (vertices.find(v) != vertices.end()) {
+      return v;
     }
-    adjacencies[v] = {};
-    properties[v]  = p;
+    vertices[v]   = {};
+    properties[v] = p;
     return v;
   }
 
-  void add_edge(const vertex &from, const vertex &to, const weight &w = 1) {
-    if (properties.find(from) == properties.end()) {
+  void add_edge(const vertex &from, const vertex &to, const weight &w = 1.0) {
+    if (vertices.find(from) == vertices.end()) {
       add_vertex(from);
     }
-    if (properties.find(to) == properties.end()) {
+    if (vertices.find(to) == vertices.end()) {
       add_vertex(to);
     }
-    adjacencies[from].emplace_back(std::make_pair(to, w));
+    vertices.at(from).emplace_back(std::make_pair(to, w));
     if (!directed) {
-      adjacencies[to].emplace_back(std::make_pair(from, w));
+      vertices.at(to).emplace_back(std::make_pair(from, w));
     }
   }
 
@@ -146,55 +144,59 @@ class graph {
     return removed;
   }
 
-  void from_json(const std::string &file) {
-    std::ifstream fs(file);
+  void from_json(const std::string &path) {
+    std::ifstream fs(path);
     if (!fs.is_open()) {
-      throw std::runtime_error("unable to open: " + file);
+      throw std::runtime_error("unable to open: " + path);
     }
 
     nlohmann::json j;
     fs >> j;
 
-    this->directed = j["directed"].get<bool>();
-    auto nodes     = j["nodes"];
-    auto edges     = j["edges"];
+    directed = j["directed"].get<bool>();
+    auto vertices = j["vertices"];
+    auto edges    = j["edges"];
 
-    for (auto &node : nodes) {
-      add_vertex(node["id"], property(node["label"], node["color"]));
+    for (auto &v : vertices) {
+      add_vertex(v["id"].get<vertex>(), property(
+        v["label"].get<std::string>(),
+        v["color"].get<std::string>()));
     }
 
     for (auto &edge : edges) {
-      add_edge(edge["from"], edge["to"], edge.value("weight", 1.0));
+      add_edge(edge["from"].get<vertex>(),
+                edge["to"].get<vertex>(),
+                edge["weight"].get<weight>());
     }
   }
 
   nlohmann::json to_json() const {
     nlohmann::json j;
-    j["directed"] = this->directed;
+    j["directed"] = directed;
 
     // Serialize nodes
-    auto nodes = nlohmann::json::array();
-    for (const auto &pair : this->properties) {
-      nlohmann::json node;
-      node["id"]    = pair.first;
-      node["label"] = pair.second.label;
-      node["color"] = pair.second.color;
-      nodes.push_back(node);
+    auto vs = nlohmann::json::array();
+    for (const auto &pair : properties) {
+      nlohmann::json v;
+      v["id"]    = pair.first;
+      v["label"] = pair.second.label;
+      v["color"] = pair.second.color;
+      vs.push_back(v);
     }
-    j["nodes"] = nodes;
+    j["vertices"] = vs;
 
     // Serialize edges
-    auto edges = nlohmann::json::array();
-    for (const auto &pair : this->adjacencies) {
-      for (const auto &neighbor : pair.second) {
-        nlohmann::json edge;
-        edge["from"]   = pair.first;
-        edge["to"]     = neighbor.first;
-        edge["weight"] = neighbor.second;
-        edges.push_back(edge);
+    auto es = nlohmann::json::array();
+    for (const auto &pair : vertices) {
+      for (const auto &edge : pair.second) {
+        nlohmann::json e;
+        e["from"]   = pair.first;
+        e["to"]     = edge.first;
+        e["weight"] = edge.second;
+        es.push_back(e);
       }
     }
-    j["edges"] = edges;
+    j["edges"] = es;
     return j;
   }
 
@@ -204,6 +206,11 @@ class graph {
   }
 
   void bfs(vertex &start, const function &f) {
+    auto it = vertices.find(start);
+    if (it == vertices.end()) {
+      return;
+    }
+
     std::map<vertex, bool> visited;
     std::queue<vertex> q;
 
@@ -211,15 +218,16 @@ class graph {
     q.push(start);
 
     while (!q.empty()) {
-      auto v = q.front();
+      auto &v = q.front();
       q.pop();
 
       f(v);
 
-      for (auto &neighbor : adjacencies[v]) {
-        if (!visited[neighbor.first]) {
-          visited[neighbor.first] = true;
-          q.push(neighbor.first);
+      auto &edges = vertices.at(v);
+      for (auto &edge : edges) {
+        if (!visited[edge.first]) {
+          visited[edge.first] = true;
+          q.push(edge.first);
         }
       }
     }
@@ -234,23 +242,23 @@ class graph {
       if (predecessors.find(end) == predecessors.end()) {
         return path;
       }
-      for (auto at = end; at != std::numeric_limits<vertex>::max(); at = predecessors[at]) {
-        path.emplace_back(at);
+      for (auto it = end; it != VERTEX_END; it = predecessors.at(it)) {
+        path.emplace_back(it);
       }
       std::reverse(path.begin(), path.end());
       return path;
     }
   };
 
-  result dijkstra(const vertex &start) {
+  result dijkstra(const vertex &start) const {
     std::priority_queue<std::pair<weight, vertex>,
                         std::vector<std::pair<weight, vertex>>,
                         std::greater<std::pair<weight, vertex>>> pq;
 
     result res;
-    for (const auto &pair : adjacencies) {
-      res.distances[pair.first]    = std::numeric_limits<weight>::infinity();
-      res.predecessors[pair.first] = std::numeric_limits<vertex>::max();
+    for (const auto &pair : vertices) {
+      res.distances[pair.first]    = WEIGHT_INF;
+      res.predecessors[pair.first] = VERTEX_END;
     }
 
     res.distances[start] = 0;
@@ -262,9 +270,10 @@ class graph {
 
       if (d > res.distances[u]) { continue; }
 
-      for (const auto &neighbor : adjacencies[u]) {
-        auto v = neighbor.first;
-        auto w = neighbor.second;
+      const auto &edges = vertices.at(u);
+      for (const auto &edge : edges) {
+        auto v = edge.first;
+        auto w = edge.second;
         auto alt = res.distances[u] + w;
         if (alt < res.distances[v]) {
           res.distances[v]    = alt;
@@ -276,21 +285,21 @@ class graph {
     return res;
   }
 
-  result bellman_ford(const vertex &start) {
+  result bellman_ford(const vertex &start) const {
     result res;
-    for (const auto &pair : adjacencies) {
-      res.distances[pair.first]    = std::numeric_limits<weight>::infinity();
-      res.predecessors[pair.first] = std::numeric_limits<vertex>::max();
+    for (const auto &pair : vertices) {
+      res.distances[pair.first]    = WEIGHT_INF;
+      res.predecessors[pair.first] = VERTEX_END;
     }
     res.distances[start] = 0;
 
-    for (size_t i = 0; i < adjacencies.size(); i++) {
+    for (size_t i = 0; i < vertices.size(); i++) {
       auto updated = false;
-      for (const auto &pair : adjacencies) {
+      for (const auto &pair : vertices) {
         auto u = pair.first;
-        for (const auto &neighbor : pair.second) {
-          auto v = neighbor.first;
-          auto w = neighbor.second;
+        for (const auto &edge : pair.second) {
+          auto v = edge.first;
+          auto w = edge.second;
           if (res.distances[u] + w < res.distances[v]) {
             res.distances[v]    = res.distances[u] + w;
             res.predecessors[v] = u;
@@ -299,36 +308,115 @@ class graph {
         }
       }
       if (!updated) { break; }
-      if (i == adjacencies.size() - 1 && updated) {
+      if (i == vertices.size() - 1 && updated) {
         throw std::runtime_error("negative cycle detected");
       }
     }
     return res;
   }
 
+  struct floyd_warshall_result {
+    matrix<weight> dist = {};
+    matrix<vertex> pred = {};
+
+    std::optional<weight> distance(const vertex &from, const vertex &to) const {
+      if (dist.find(from) == dist.end() ||
+          dist.at(from).find(to) == dist.at(from).end()) {
+        return std::nullopt;
+      }
+      return dist.at(from).at(to);
+    }
+
+    std::vector<vertex> path(const vertex &from, const vertex &to) {
+      std::vector<vertex> p;
+      if (pred.find(from) == pred.end() ||
+          pred.at(from).find(to) == pred.at(from).end()) {
+        return p;
+      }
+
+      auto iter = to;
+      while (iter != from) {
+        p.emplace_back(iter);
+        iter = pred.at(from).at(iter);
+      }
+      p.emplace_back(from);
+      std::reverse(p.begin(), p.end());
+      return p;
+    }
+  };
+
+  floyd_warshall_result floyd_warshall() const {
+    floyd_warshall_result res;
+    for (const auto &pair : vertices) {
+      auto u = pair.first;
+      for (const auto &edge : pair.second) {
+        auto v = edge.first;
+        auto w = edge.second;
+        res.dist[u][v] = w;
+        res.pred[u][v] = u;
+      }
+      res.dist[u][u] = 0;
+    }
+
+    for (const auto &k_pair : vertices) {
+      for (const auto &i_pair : vertices) {
+        for (const auto &j_pair : vertices) {
+          auto k = k_pair.first, i = i_pair.first, j = j_pair.first;
+          if (res.dist.at(i).find(k) != res.dist.at(i).end() &&
+              res.dist.at(k).find(j) != res.dist.at(k).end()) {
+            auto alt = res.dist.at(i).at(k) + res.dist.at(k).at(j);
+            if (res.dist.at(i).find(j) == res.dist.at(i).end() ||
+                alt < res.dist[i][j]) {
+              res.dist[i][j] = alt;
+              res.pred[i][j] = res.pred[k][j];
+            }
+          }
+        }
+      }
+    }
+
+    for (const auto &pair : vertices) {
+      auto u = pair.first;
+      if (res.dist[u][u] < 0) {
+        throw std::runtime_error("negative cycle detected");
+      }
+    }
+
+    return res;
+  }
+
  private:
   bool remove_helper(const vertex &from, const vertex &to) {
     bool removed = false;
+    auto vit = vertices.find(from);
+    if (vit == vertices.end()) {
+      return removed;
+    }
     // Find and remove the edge from 'from' to 'to'.
-    auto &neighbors = adjacencies[from];
-    auto it = std::find_if(neighbors.begin(), neighbors.end(),
-                          [&to](const neighbor &n) {
-      return n.first == to;
+    auto &edges = vit->second;
+    auto eit = std::find_if(edges.begin(), edges.end(), [&to](const edge &e) {
+      return e.first == to;
     });
-    if (it != neighbors.end()) {
-      neighbors.erase(it);
+    if (eit != edges.end()) {
+      edges.erase(eit);
       removed = true;
     }
     return removed;
   }
 
   void dfs_helper(vertex &v, std::map<vertex, bool> &visited, const function &f) {
+    auto it = vertices.find(v);
+    if (it == vertices.end()) {
+      return;
+    }
+
     visited[v] = true;
     f(v);
 
-    for (auto &neighbor : adjacencies[v]) {
-      if (!visited[neighbor.first]) {
-        dfs_helper(neighbor.first, visited, f);
+    auto &edges = vertices.at(v);
+    for (auto &edge : edges) {
+      if (!visited[edge.first]) {
+        dfs_helper(edge.first, visited, f);
       }
     }
   }
