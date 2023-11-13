@@ -394,3 +394,46 @@ TEST_F(GraphTest, FloydWarshall) {
   std::vector<rondo::graph::vertex> expect = {v0, v2, v3, v4, v5, v1};
   EXPECT_EQ(result.path(v0, v1), expect);
 }
+
+TEST_F(GraphTest, MST_EmptyGraph) {
+  auto mst = g_undirected.mst();
+  EXPECT_TRUE(mst.empty());
+}
+
+TEST_F(GraphTest, MST_SingleVertex) {
+  g_undirected.add_vertex();
+  auto mst = g_undirected.mst();
+  EXPECT_EQ(mst.size(), 1);
+}
+
+TEST_F(GraphTest, MST_Connected) {
+  g_undirected.add_edge(0, 1, 10);
+  g_undirected.add_edge(0, 2, 6);
+  g_undirected.add_edge(0, 3, 5);
+  g_undirected.add_edge(1, 3, 15);
+  g_undirected.add_edge(2, 3, 4);
+
+  auto mst = g_undirected.mst();
+
+  EXPECT_EQ(mst.size(), 4);
+}
+
+TEST_F(GraphTest, MST_Disconnected) {
+  g_undirected.add_vertex(0);
+  g_undirected.add_edge(1, 2, 15);
+  g_undirected.add_edge(2, 3, 10);
+
+  auto mst0 = g_undirected.mst(0);
+  auto mst1 = g_undirected.mst(1);
+
+  EXPECT_EQ(mst0.size(), 1);
+  EXPECT_EQ(mst1.size(), 3);
+}
+
+TEST_F(GraphTest, MST_DirectedGraph) {
+  g_directed.add_edge(0, 1, 5);
+  g_directed.add_edge(1, 2, 10);
+  g_directed.add_edge(2, 0, 5);
+
+  EXPECT_THROW(g_directed.mst(), std::runtime_error);
+}

@@ -15,6 +15,7 @@ class graph {
  public:
   using vertex   = size_t;
   using weight   = double_t;
+  using from_to  = std::pair<vertex, vertex>;
   using edge     = std::pair<vertex, weight>;
   using edges    = std::vector<edge>;
   using function = std::function<void(vertex &)>;
@@ -385,6 +386,18 @@ class graph {
     return res;
   }
 
+  graph mst() {
+    auto start = vertices.begin()->first;
+    return mst_helper(start);
+  }
+
+  graph mst(const vertex &start) {
+    if (vertices.find(start) == vertices.end()) {
+      return graph();
+    }
+    return mst_helper(start);
+  }
+
  private:
   bool remove_helper(const vertex &from, const vertex &to) {
     bool removed = false;
@@ -419,6 +432,60 @@ class graph {
         dfs_helper(edge.first, visited, f);
       }
     }
+  }
+
+  graph mst_helper(const vertex &start) {
+    if (directed) {
+      throw std::runtime_error("mst: directed graph");
+    }
+
+    graph g;
+
+    if (empty()) {
+      return g;
+    }
+
+    std::map<vertex, bool> visited;
+    for (const auto &pair : vertices) {
+      visited[pair.first] = false;
+    }
+
+    auto cmp = [](const std::pair<weight, from_to>& left,
+                  const std::pair<weight, from_to>& right) {
+      return left.first > right.first;
+    };
+    std::priority_queue<std::pair<weight, from_to>,
+                        std::vector<std::pair<weight, from_to>>,
+                        decltype(cmp)> pq(cmp);
+
+    visited[start] = true;
+    g.add_vertex(start, properties.at(start));
+
+    for (const auto &edge : vertices.at(start)) {
+      pq.emplace(edge.second, std::make_pair(start, edge.first));
+    }
+
+    while (!pq.empty()) {
+      auto p = pq.top();
+      auto w = p.first;
+      auto u = p.second.first;
+      auto v = p.second.second;
+      pq.pop();
+
+      if (visited[v]) { continue; }
+
+      visited[v] = true;
+      g.add_vertex(v, properties.at(v));
+      g.add_edge(u, v, w);
+
+      for (const auto &e : vertices.at(v)) {
+        if (!visited[e.first]) {
+          pq.emplace(e.second, std::make_pair(v, e.first));
+        }
+      }
+    }
+
+    return g;
   }
 };
 }  // namespace rondo
