@@ -58,9 +58,9 @@ TEST_F(GraphTest, AddVertex) {
 TEST_F(GraphTest, AddVertexWithProperties) {
   rondo::graph::property p("label1", "color1");
   auto v1   = g_undirected.add_vertex(p);
-  auto prop = g_undirected.get_property(v1);
-  EXPECT_EQ(prop.label, "label1");
-  EXPECT_EQ(prop.color, "color1");
+  auto result = g_undirected.get_property(v1);
+  EXPECT_EQ(result.value().label, "label1");
+  EXPECT_EQ(result.value().color, "color1");
 }
 
 TEST_F(GraphTest, AddEdge) {
@@ -93,7 +93,8 @@ TEST_F(GraphTest, GetNeighbors) {
 
   auto edges = g_undirected.get_edges(v1);
   EXPECT_EQ(edges.size(), 1);
-  EXPECT_EQ(edges[0].first, v2);
+  EXPECT_EQ(edges[0].first, v1);
+  EXPECT_EQ(edges[0].second, v2);
 }
 
 TEST_F(GraphTest, GetWeight) {
@@ -111,9 +112,9 @@ TEST_F(GraphTest, SetProperty) {
   rondo::graph::property p("new_label", "new_color");
   g_undirected.set_property(v1, p);
 
-  auto prop = g_undirected.get_property(v1);
-  EXPECT_EQ(prop.label, "new_label");
-  EXPECT_EQ(prop.color, "new_color");
+  auto result = g_undirected.get_property(v1);
+  EXPECT_EQ(result.value().label, "new_label");
+  EXPECT_EQ(result.value().color, "new_color");
 }
 
 TEST_F(GraphTest, ToJson) {
@@ -168,7 +169,7 @@ TEST_F(GraphTest, DfsTraversal) {
   g_directed.add_edge(v2, v4);
 
   std::vector<rondo::graph::vertex> visited_order;
-  g_directed.dfs(v1, [&visited_order](rondo::graph::vertex &v) {
+  g_directed.dfs(v1, [&visited_order](const rondo::graph::vertex &v) {
     visited_order.push_back(v);
   });
 
@@ -186,7 +187,7 @@ TEST_F(GraphTest, BfsTraversal) {
   g_directed.add_edge(v2, v4);
 
   std::vector<rondo::graph::vertex> visited_order;
-  g_directed.bfs(v1, [&visited_order](rondo::graph::vertex &v) {
+  g_directed.bfs(v1, [&visited_order](const rondo::graph::vertex &v) {
     visited_order.push_back(v);
   });
 

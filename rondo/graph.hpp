@@ -2,6 +2,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <fstream>
 #include <limits>
 #include <map>
@@ -15,10 +16,8 @@ class graph {
  public:
   using vertex   = size_t;
   using weight   = double_t;
-  using from_to  = std::pair<vertex, vertex>;
-  using edge     = std::pair<vertex, weight>;
-  using edges    = std::vector<edge>;
-  using function = std::function<void(vertex &)>;
+  using edge     = std::pair<vertex, vertex>;
+  using function = std::function<void(const vertex &)>;
 
   template <typename T>
   using matrix = std::map<vertex, std::map<vertex, T>>;
@@ -35,8 +34,10 @@ class graph {
   };
 
  private:
-  std::map<vertex, edges>    vertices   = {};
-  std::map<vertex, property> properties = {};
+  std::map<vertex, property> vertices = {};
+  std::vector<edge>          edges    = {};
+  std::map<edge, weight>     weights  = {};
+
   vertex next = VERTEX_END;
   bool directed = false;
 
@@ -45,7 +46,6 @@ class graph {
 
   void clear() {
     vertices.clear();
-    properties.clear();
     next = VERTEX_END;
   }
 
@@ -57,83 +57,108 @@ class graph {
     return vertices.empty();
   }
 
-  const edges &operator[](const vertex &v) const {
-    return vertices.at(v);
+  std::vector<edge> operator[](const vertex &v) const {
+    std::vector<edge> ret;
+    std::copy_if(edges.begin(), edges.end(), std::back_inserter(ret),
+                 [&v](const edge &e) {
+      return e.first == v;
+    });
+    return ret;
   }
 
-  const property &operator()(const vertex &v) const {
-    return properties.at(v);
-  }
-
-  const edges &get_edges(const vertex &v) const {
-    return vertices.at(v);
-  }
-
-  const property &get_property(const vertex &v) const {
-    return properties.at(v);
-  }
-
-  std::optional<weight> get_weight(const vertex &from, const vertex &to) const {
-    auto it = vertices.find(from);
+  std::optional<property> operator()(const vertex &v) const {
+    auto it = vertices.find(v);
     if (it == vertices.end()) {
       return std::nullopt;
     }
-    auto &edges = it->second;
-    for (const auto &edge : edges) {
-      if (edge.first == to) {
-        return edge.second;
-      }
-    }
-    return  std::nullopt;
+    return vertices.at(v);
   }
 
-  void set_property(const vertex &v, const property &p) {
-    if (properties.find(v) != properties.end()) {
-      properties[v] = p;
+  std::vector<edge> get_edges(const vertex &v) const {
+    std::vector<edge> ret;
+    std::copy_if(edges.begin(), edges.end(), std::back_inserter(ret),
+                 [&v](const edge &e) {
+      return e.first == v;
+    });
+    return ret;
+  }
+
+  std::optional<property> get_property(const vertex &v) const {
+    auto it = vertices.find(v);
+    if (it == vertices.end()) {
+      return std::nullopt;
     }
+    return vertices.at(v);
+  }
+
+  std::optional<weight> get_weight(const edge &e) const {
+    auto it = weights.find(e);
+    if (it == weights.end()) {
+      return std::nullopt;
+    }
+    return it->second;
+  }
+
+  std::optional<weight> get_weight(const vertex &from, const vertex &to) const {
+    auto it = weights.find(edge(from, to));
+    if (it == weights.end()) {
+      return std::nullopt;
+    }
+    return  it->second;
+  }
+
+  void set_property(const vertex &v, property p) {
+    auto it = vertices.find(v);
+    if (it != vertices.end()) {
+      vertices[v] = p;
+    }
+  }
+
+  bool has_vertex(const vertex &v) const {
+    return vertices.find(v) != vertices.end();
   }
 
   bool has_edge(const vertex &from, const vertex &to) const {
-    if (vertices.find(from) == vertices.end()) {
-      return false;
-    }
-    auto &edges = vertices.at(from);
-    auto it = std::find_if(edges.begin(), edges.end(),
-                          [&to](const edge &e) {
-      return e.first == to;
-    });
-    return it != edges.end();
+    return std::find(edges.begin(), edges.end(), edge(from, to)) != edges.end();
   }
 
-  vertex add_vertex(const property &p = property()) {
+  vertex add_vertex(property p = property()) {
     next++;
+    while (vertices.find(next) != vertices.end()) {
+      next++;
+    }
     if (next == VERTEX_END) {
       throw std::runtime_error("vertex: overflow");
     }
-    vertices[next]   = {};
-    properties[next] = p;
+    vertices[next] = p;
     return next;
   }
 
-  vertex add_vertex(const vertex &v, const property &p = property()) {
+  vertex add_vertex(const vertex &v, property p = property()) {
     if (vertices.find(v) != vertices.end()) {
-      return v;
+      throw std::runtime_error("vertex: already exists");
     }
-    vertices[v]   = {};
-    properties[v] = p;
+    if (v == VERTEX_END) {
+      throw std::runtime_error("vertex: overflow");
+    }
+    vertices[v] = p;
     return v;
   }
 
+  void add_edge(const edge &e, const weight &w = 1.0) {
+    add_edge(e.first, e.second, w);
+  }
+
   void add_edge(const vertex &from, const vertex &to, const weight &w = 1.0) {
-    if (vertices.find(from) == vertices.end()) {
+    if (!has_vertex(from)) {
       add_vertex(from);
     }
-    if (vertices.find(to) == vertices.end()) {
+    if (!has_vertex(to)) {
       add_vertex(to);
     }
-    vertices.at(from).emplace_back(std::make_pair(to, w));
+    add_edge_helper(from, to, w);
     if (!directed) {
-      vertices.at(to).emplace_back(std::make_pair(from, w));
+      add_edge_helper(to, from, w);
     }
   }
 
@@ -177,7 +202,7 @@ class graph {
 
     // Serialize nodes
     auto vs = nlohmann::json::array();
-    for (const auto &pair : properties) {
+    for (const auto &pair : vertices) {
       nlohmann::json v;
       v["id"]    = pair.first;
       v["label"] = pair.second.label;
@@ -188,20 +213,18 @@ class graph {
 
     // Serialize edges
     auto es = nlohmann::json::array();
-    for (const auto &pair : vertices) {
-      for (const auto &edge : pair.second) {
-        nlohmann::json e;
-        e["from"]   = pair.first;
-        e["to"]     = edge.first;
-        e["weight"] = edge.second;
-        es.push_back(e);
-      }
+    for (const auto &edge : edges) {
+      nlohmann::json e;
+      e["from"]   = edge.first;
+      e["to"]     = edge.second;
+      e["weight"] = get_weight(edge).value();
+      es.push_back(e);
     }
     j["edges"] = es;
     return j;
   }
 
-  void dfs(vertex &start, const function &f) {
+  void dfs(const vertex &start, const function &f) {
     std::map<vertex, bool> visited;
     dfs_helper(start, visited, f);
   }
@@ -224,11 +247,11 @@ class graph {
 
       f(v);
 
-      auto &edges = vertices.at(v);
+      auto edges = get_edges(v);
       for (auto &edge : edges) {
-        if (!visited[edge.first]) {
-          visited[edge.first] = true;
-          q.push(edge.first);
+        if (!visited[edge.second]) {
+          visited[edge.second] = true;
+          q.push(edge.second);
         }
       }
     }
@@ -271,10 +294,10 @@ class graph {
 
       if (d > res.distances[u]) { continue; }
 
-      const auto &edges = vertices.at(u);
+      auto edges = get_edges(u);
       for (const auto &edge : edges) {
-        auto v = edge.first;
-        auto w = edge.second;
+        auto v = edge.second;
+        auto w = get_weight(u, v).value();
         auto alt = res.distances[u] + w;
         if (alt < res.distances[v]) {
           res.distances[v]    = alt;
@@ -296,16 +319,15 @@ class graph {
 
     for (size_t i = 0; i < vertices.size(); i++) {
       auto updated = false;
-      for (const auto &pair : vertices) {
-        auto u = pair.first;
-        for (const auto &edge : pair.second) {
-          auto v = edge.first;
-          auto w = edge.second;
-          if (res.distances[u] + w < res.distances[v]) {
-            res.distances[v]    = res.distances[u] + w;
-            res.predecessors[v] = u;
-            updated = true;
-          }
+      for (const auto &edge : edges) {
+        auto u = edge.first;
+        auto v = edge.second;
+        auto w = get_weight(u, v).value();
+        auto alt = res.distances[u] + w;
+        if (alt < res.distances[v]) {
+          res.distances[v]    = alt;
+          res.predecessors[v] = u;
+          updated = true;
         }
       }
       if (!updated) { break; }
@@ -350,9 +372,9 @@ class graph {
     floyd_warshall_result res;
     for (const auto &pair : vertices) {
       auto u = pair.first;
-      for (const auto &edge : pair.second) {
-        auto v = edge.first;
-        auto w = edge.second;
+      for (const auto &edge : get_edges(u)) {
+        auto v = edge.second;
+        auto w = get_weight(u, v).value();
         res.dist[u][v] = w;
         res.pred[u][v] = u;
       }
@@ -399,25 +421,25 @@ class graph {
   }
 
  private:
+  void add_edge_helper(const vertex &from, const vertex &to, const weight &w) {
+    auto from_to = edge(from, to);
+    edges.emplace_back(from_to);
+    weights[from_to] = w;
+  }
+
   bool remove_helper(const vertex &from, const vertex &to) {
     bool removed = false;
-    auto vit = vertices.find(from);
-    if (vit == vertices.end()) {
-      return removed;
-    }
-    // Find and remove the edge from 'from' to 'to'.
-    auto &edges = vit->second;
-    auto eit = std::find_if(edges.begin(), edges.end(), [&to](const edge &e) {
-      return e.first == to;
-    });
-    if (eit != edges.end()) {
-      edges.erase(eit);
+    auto from_to = edge(from, to);
+    auto it = std::find(edges.begin(), edges.end(), from_to);
+    if (it != edges.end()) {
+      edges.erase(it);
+      weights.erase(from_to);
       removed = true;
     }
     return removed;
   }
 
-  void dfs_helper(vertex &v, std::map<vertex, bool> &visited, const function &f) {
+  void dfs_helper(const vertex &v, std::map<vertex, bool> &visited, const function &f) {
     auto it = vertices.find(v);
     if (it == vertices.end()) {
       return;
@@ -426,10 +448,10 @@ class graph {
     visited[v] = true;
     f(v);
 
-    auto &edges = vertices.at(v);
+    auto edges = get_edges(v);
     for (auto &edge : edges) {
-      if (!visited[edge.first]) {
-        dfs_helper(edge.first, visited, f);
+      if (!visited[edge.second]) {
+        dfs_helper(edge.second, visited, f);
       }
     }
   }
@@ -450,19 +472,19 @@ class graph {
       visited[pair.first] = false;
     }
 
-    auto cmp = [](const std::pair<weight, from_to>& left,
-                  const std::pair<weight, from_to>& right) {
+    auto cmp = [](const std::pair<weight, edge>& left,
+                  const std::pair<weight, edge>& right) {
       return left.first > right.first;
     };
-    std::priority_queue<std::pair<weight, from_to>,
-                        std::vector<std::pair<weight, from_to>>,
+    std::priority_queue<std::pair<weight, edge>,
+                        std::vector<std::pair<weight, edge>>,
                         decltype(cmp)> pq(cmp);
 
     visited[start] = true;
-    g.add_vertex(start, properties.at(start));
+    g.add_vertex(start, vertices.at(start));
 
-    for (const auto &edge : vertices.at(start)) {
-      pq.emplace(edge.second, std::make_pair(start, edge.first));
+    for (const auto &edge : get_edges(start)) {
+      pq.emplace(get_weight(edge).value(), edge);
     }
 
     while (!pq.empty()) {
@@ -475,16 +497,15 @@ class graph {
       if (visited[v]) { continue; }
 
       visited[v] = true;
-      g.add_vertex(v, properties.at(v));
+      g.add_vertex(v, vertices.at(v));
       g.add_edge(u, v, w);
 
-      for (const auto &e : vertices.at(v)) {
-        if (!visited[e.first]) {
-          pq.emplace(e.second, std::make_pair(v, e.first));
+      for (const auto &edge : get_edges(v)) {
+        if (!visited[edge.second]) {
+          pq.emplace(get_weight(edge).value(), edge);
         }
       }
     }
-
     return g;
   }
 };
