@@ -501,7 +501,7 @@ class graph {
       }
       for (const auto &e : get_edges(u, residuals)) {
         auto v  = e.second;
-        if (!visited[v] && residuals.at(e)) {
+        if (!visited[v] && residuals.at(e) > 0) {
           visited[v] = true;
           parent[v]  = u; // Record the path
           queue.push(v);
