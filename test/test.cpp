@@ -86,7 +86,21 @@ TEST_F(GraphTest, RemoveEdge) {
   EXPECT_FALSE(g_undirected.has_edge(v2, v1)); // Check removal of undirected back edge
 }
 
-TEST_F(GraphTest, GetNeighbors) {
+TEST_F(GraphTest, GetVertices) {
+  auto p1 = rondo::graph::property("label1", "color1");
+  auto p2 = rondo::graph::property("label2", "color2");
+  auto v1 = g_undirected.add_vertex(p1);
+  auto v2 = g_undirected.add_vertex(p2);
+
+  auto vertices = g_undirected.get_vertices();
+  EXPECT_EQ(vertices.size(), 2);
+  EXPECT_EQ(vertices[v1].label, p1.label);
+  EXPECT_EQ(vertices[v1].color, p1.color);
+  EXPECT_EQ(vertices[v2].label, p2.label);
+  EXPECT_EQ(vertices[v2].color, p2.color);
+}
+
+TEST_F(GraphTest, GetEdges) {
   auto v1 = g_undirected.add_vertex();
   auto v2 = g_undirected.add_vertex();
   g_undirected.add_edge(v1, v2);
@@ -200,10 +214,10 @@ TEST_F(GraphTest, DijkstraShortestPath) {
   auto v2 = g_directed.add_vertex();
   auto v3 = g_directed.add_vertex();
   auto v4 = g_directed.add_vertex();
-  g_directed.add_edge(v1, v2, 1);
-  g_directed.add_edge(v2, v3, 1);
-  g_directed.add_edge(v3, v4, 1);
-  g_directed.add_edge(v1, v4, 10);
+  g_directed.add_edge(v1, v2, rondo::graph::weight(1));
+  g_directed.add_edge(v2, v3, rondo::graph::weight(1));
+  g_directed.add_edge(v3, v4, rondo::graph::weight(1));
+  g_directed.add_edge(v1, v4, rondo::graph::weight(10));
 
   auto result = g_directed.dijkstra(v1);
 
@@ -222,16 +236,16 @@ TEST_F(GraphTest, BellmanFordShortestPath) {
   auto v4 = g_directed.add_vertex();
 
   // Add edges with weights
-  g_directed.add_edge(v0, v1, 6);
-  g_directed.add_edge(v0, v2, 7);
-  g_directed.add_edge(v1, v2, 8);
-  g_directed.add_edge(v1, v3, 5);
-  g_directed.add_edge(v1, v4, -4);
-  g_directed.add_edge(v2, v3, -3);
-  g_directed.add_edge(v2, v4, 9);
-  g_directed.add_edge(v3, v1, -2);
-  g_directed.add_edge(v4, v0, 2);
-  g_directed.add_edge(v4, v3, 7);
+  g_directed.add_edge(v0, v1, rondo::graph::weight(6));
+  g_directed.add_edge(v0, v2, rondo::graph::weight(7));
+  g_directed.add_edge(v1, v2, rondo::graph::weight(8));
+  g_directed.add_edge(v1, v3, rondo::graph::weight(5));
+  g_directed.add_edge(v1, v4, rondo::graph::weight(-4));
+  g_directed.add_edge(v2, v3, rondo::graph::weight(-3));
+  g_directed.add_edge(v2, v4, rondo::graph::weight(9));
+  g_directed.add_edge(v3, v1, rondo::graph::weight(-2));
+  g_directed.add_edge(v4, v0, rondo::graph::weight(2));
+  g_directed.add_edge(v4, v3, rondo::graph::weight(7));
 
   // Compute shortest paths from v0 using Bellman-Ford
   auto result = g_directed.bellman_ford(v0);
@@ -257,9 +271,9 @@ TEST_F(GraphTest, BellmanFordEarlyExit) {
   auto v1 = g_directed.add_vertex();
   auto v2 = g_directed.add_vertex();
 
-  g_directed.add_edge(v0, v1, 4);
-  g_directed.add_edge(v1, v2, -6);
-  g_directed.add_edge(v2, v0, 3);
+  g_directed.add_edge(v0, v1, rondo::graph::weight(4));
+  g_directed.add_edge(v1, v2, rondo::graph::weight(-6));
+  g_directed.add_edge(v2, v0, rondo::graph::weight(3));
 
   // Compute shortest paths from v0 using Bellman-Ford
   auto result = g_directed.bellman_ford(v0);
@@ -284,16 +298,16 @@ TEST_F(GraphTest, BellmanFordNegativeCycle) {
   auto v4 = g_directed.add_vertex();
   auto v5 = g_directed.add_vertex();
 
-  g_directed.add_edge(v0, v1, 5);
-  g_directed.add_edge(v0, v2, 4);
-  g_directed.add_edge(v1, v2, -2);
-  g_directed.add_edge(v1, v3, 1);
-  g_directed.add_edge(v2, v3, 2);
-  g_directed.add_edge(v2, v4, 1);
-  g_directed.add_edge(v2, v5, 4);
-  g_directed.add_edge(v3, v1, -1);
-  g_directed.add_edge(v3, v5, 3);
-  g_directed.add_edge(v4, v5, 4);
+  g_directed.add_edge(v0, v1, rondo::graph::weight(5));
+  g_directed.add_edge(v0, v2, rondo::graph::weight(4));
+  g_directed.add_edge(v1, v2, rondo::graph::weight(-2));
+  g_directed.add_edge(v1, v3, rondo::graph::weight(1));
+  g_directed.add_edge(v2, v3, rondo::graph::weight(2));
+  g_directed.add_edge(v2, v4, rondo::graph::weight(1));
+  g_directed.add_edge(v2, v5, rondo::graph::weight(4));
+  g_directed.add_edge(v3, v1, rondo::graph::weight(-1));
+  g_directed.add_edge(v3, v5, rondo::graph::weight(3));
+  g_directed.add_edge(v4, v5, rondo::graph::weight(4));
 
   // Compute shortest paths from v0 using Bellman-Ford
   EXPECT_THROW({
@@ -311,7 +325,7 @@ TEST_F(GraphTest, FloydWarshallZeroEdges) {
 
 TEST_F(GraphTest, FloydWarshallSelfLoop) {
   auto v0 = g_directed.add_vertex();
-  g_directed.add_edge(v0, v0, 1);
+  g_directed.add_edge(v0, v0, rondo::graph::weight(1));
 
   auto result = g_directed.floyd_warshall();
   EXPECT_DOUBLE_EQ(result.distance(v0, v0).value(), 0);
@@ -351,8 +365,8 @@ TEST_F(GraphTest, FloydWarshallNegativeCycleTwoVertices) {
   auto v0 = g_directed.add_vertex();
   auto v1 = g_directed.add_vertex();
 
-  g_directed .add_edge(v0, v1, 1);
-  g_directed .add_edge(v1, v0, -2);
+  g_directed .add_edge(v0, v1, rondo::graph::weight(1));
+  g_directed .add_edge(v1, v0, rondo::graph::weight(-2));
   EXPECT_THROW({
     g_directed.floyd_warshall();
   }, std::runtime_error);
@@ -363,9 +377,9 @@ TEST_F(GraphTest, FloydWarshallNegativeCycleBasic) {
   auto v1 = g_directed.add_vertex();
   auto v2 = g_directed.add_vertex();
 
-  g_directed .add_edge(v0, v1, 2);
-  g_directed .add_edge(v1, v2, 3);
-  g_directed .add_edge(v2, v1, -6);
+  g_directed .add_edge(v0, v1, rondo::graph::weight(2));
+  g_directed .add_edge(v1, v2, rondo::graph::weight(3));
+  g_directed .add_edge(v2, v1, rondo::graph::weight(-6));
   EXPECT_THROW({
     g_directed.floyd_warshall();
   }, std::runtime_error);
@@ -379,12 +393,12 @@ TEST_F(GraphTest, FloydWarshall) {
   auto v4 = g_directed.add_vertex();
   auto v5 = g_directed.add_vertex();
 
-  g_directed.add_edge(v0, v1, 6);
-  g_directed.add_edge(v0, v2, 4);
-  g_directed.add_edge(v2, v3, 3);
-  g_directed.add_edge(v3, v4, -1);
-  g_directed.add_edge(v4, v5, -2);
-  g_directed.add_edge(v5, v1, 1);
+  g_directed.add_edge(v0, v1, rondo::graph::weight(6));
+  g_directed.add_edge(v0, v2, rondo::graph::weight(4));
+  g_directed.add_edge(v2, v3, rondo::graph::weight(3));
+  g_directed.add_edge(v3, v4, rondo::graph::weight(-1));
+  g_directed.add_edge(v4, v5, rondo::graph::weight(-2));
+  g_directed.add_edge(v5, v1, rondo::graph::weight(1));
 
   auto result = g_directed.floyd_warshall();
 
@@ -408,11 +422,11 @@ TEST_F(GraphTest, MST_SingleVertex) {
 }
 
 TEST_F(GraphTest, MST_Connected) {
-  g_undirected.add_edge(0, 1, 10);
-  g_undirected.add_edge(0, 2, 6);
-  g_undirected.add_edge(0, 3, 5);
-  g_undirected.add_edge(1, 3, 15);
-  g_undirected.add_edge(2, 3, 4);
+  g_undirected.add_edge(0, 1, rondo::graph::weight(10));
+  g_undirected.add_edge(0, 2, rondo::graph::weight(6));
+  g_undirected.add_edge(0, 3, rondo::graph::weight(5));
+  g_undirected.add_edge(1, 3, rondo::graph::weight(15));
+  g_undirected.add_edge(2, 3, rondo::graph::weight(4));
 
   auto mst = g_undirected.mst();
 
@@ -421,8 +435,8 @@ TEST_F(GraphTest, MST_Connected) {
 
 TEST_F(GraphTest, MST_Disconnected) {
   g_undirected.add_vertex(0);
-  g_undirected.add_edge(1, 2, 15);
-  g_undirected.add_edge(2, 3, 10);
+  g_undirected.add_edge(1, 2, rondo::graph::weight(15));
+  g_undirected.add_edge(2, 3, rondo::graph::weight(10));
 
   auto mst0 = g_undirected.mst(0);
   auto mst1 = g_undirected.mst(1);
@@ -432,9 +446,129 @@ TEST_F(GraphTest, MST_Disconnected) {
 }
 
 TEST_F(GraphTest, MST_DirectedGraph) {
-  g_directed.add_edge(0, 1, 5);
-  g_directed.add_edge(1, 2, 10);
-  g_directed.add_edge(2, 0, 5);
+  g_directed.add_edge(0, 1, rondo::graph::weight(5));
+  g_directed.add_edge(1, 2, rondo::graph::weight(10));
+  g_directed.add_edge(2, 0, rondo::graph::weight(5));
 
   EXPECT_THROW(g_directed.mst(), std::runtime_error);
+}
+
+TEST_F(GraphTest, FlowNetworkAddEdge) {
+  auto v1 = g_directed.add_vertex();
+  auto v2 = g_directed.add_vertex();
+  g_directed.add_edge(v1, v2, rondo::graph::capacity(5));
+
+  EXPECT_TRUE(g_directed.has_edge(v1, v2));
+  EXPECT_FALSE(g_directed.has_edge(v2, v1)); // Should not exist for directed graph
+}
+
+TEST_F(GraphTest, FlowNetworkGetCapacity) {
+  auto v1 = g_directed.add_vertex();
+  auto v2 = g_directed.add_vertex();
+  g_directed.add_edge(v1, v2, rondo::graph::capacity(5));
+
+  auto result = g_directed.get_capacity(v1, v2);
+  EXPECT_TRUE(result.has_value());
+  EXPECT_DOUBLE_EQ(result.value(), 5);
+}
+
+TEST_F(GraphTest, MaxFlowUndirectedError) {
+  g_undirected.add_edge(0, 1, rondo::graph::capacity(5));
+  g_undirected.add_edge(1, 2, rondo::graph::capacity(10));
+  g_undirected.add_edge(2, 0, rondo::graph::capacity(5));
+
+  auto result = g_undirected.max_flow(0, 2);
+  EXPECT_FALSE(result.has_value());
+}
+
+TEST_F(GraphTest, MaxFlowNoSuchSource) {
+  g_directed.add_edge(0, 1, rondo::graph::capacity(5));
+  g_directed.add_edge(1, 2, rondo::graph::capacity(10));
+  g_directed.add_edge(2, 0, rondo::graph::capacity(5));
+
+  auto result = g_directed.max_flow(3, 2);
+  EXPECT_FALSE(result.has_value());
+}
+
+TEST_F(GraphTest, MaxFlowNoSuchSink) {
+  g_directed.add_edge(0, 1, rondo::graph::capacity(5));
+  g_directed.add_edge(1, 2, rondo::graph::capacity(10));
+  g_directed.add_edge(2, 0, rondo::graph::capacity(5));
+
+  auto result = g_directed.max_flow(0, 3);
+  EXPECT_FALSE(result.has_value());
+}
+
+TEST_F(GraphTest, MaxFlowOneWay) {
+  g_directed.add_edge(0, 1, rondo::graph::capacity(10));
+  g_directed.add_edge(1, 2, rondo::graph::capacity(5));
+
+  auto result = g_directed.max_flow(0, 2);
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(result.value(), 5);
+}
+
+TEST_F(GraphTest, MaxFlowWithIntermediateNodes) {
+  g_directed.add_edge(0, 1, rondo::graph::capacity(10));
+  g_directed.add_edge(1, 2, rondo::graph::capacity(5));
+  g_directed.add_edge(2, 3, rondo::graph::capacity(8));
+
+  auto result = g_directed.max_flow(0, 3);
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(result.value(), 5);
+}
+
+TEST_F(GraphTest, MaxFlowMultiplePaths) {
+  g_directed.add_edge(0, 1, rondo::graph::capacity(10));
+  g_directed.add_edge(1, 3, rondo::graph::capacity(10));
+  g_directed.add_edge(0, 2, rondo::graph::capacity(15));
+  g_directed.add_edge(2, 3, rondo::graph::capacity(10));
+
+  auto result = g_directed.max_flow(0, 3);
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(result.value(), 20);  // Sum of capacities of two paths
+}
+
+TEST_F(GraphTest, MaxFlowWithLoops) {
+  g_directed.add_edge(0, 1, rondo::graph::capacity(10));
+  g_directed.add_edge(1, 2, rondo::graph::capacity(5));
+  g_directed.add_edge(2, 1, rondo::graph::capacity(3));  // Loop back
+  g_directed.add_edge(2, 3, rondo::graph::capacity(8));
+
+  auto result = g_directed.max_flow(0, 3);
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(result.value(), 5);  // Capacity limited by the 1->2 edge
+}
+
+TEST_F(GraphTest, MaxFlowBasic0) {
+  g_directed.add_edge(0, 1, rondo::graph::capacity(10));
+  g_directed.add_edge(0, 3, rondo::graph::capacity(10));
+  g_directed.add_edge(1, 2, rondo::graph::capacity(4));
+  g_directed.add_edge(1, 3, rondo::graph::capacity(2));
+  g_directed.add_edge(1, 4, rondo::graph::capacity(8));
+  g_directed.add_edge(2, 5, rondo::graph::capacity(10));
+  g_directed.add_edge(3, 4, rondo::graph::capacity(9));
+  g_directed.add_edge(4, 2, rondo::graph::capacity(6));
+  g_directed.add_edge(4, 5, rondo::graph::capacity(10));
+
+  auto result = g_directed.max_flow(0, 5);
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(result.value(), 19);
+}
+
+TEST_F(GraphTest, MaxFlowBasic1) {
+  g_directed.add_edge(0, 1, rondo::graph::capacity(16));
+  g_directed.add_edge(0, 2, rondo::graph::capacity(13));
+  g_directed.add_edge(1, 2, rondo::graph::capacity(10));
+  g_directed.add_edge(1, 3, rondo::graph::capacity(12));
+  g_directed.add_edge(2, 1, rondo::graph::capacity(4));
+  g_directed.add_edge(2, 4, rondo::graph::capacity(14));
+  g_directed.add_edge(3, 2, rondo::graph::capacity(9));
+  g_directed.add_edge(3, 5, rondo::graph::capacity(20));
+  g_directed.add_edge(4, 3, rondo::graph::capacity(7));
+  g_directed.add_edge(4, 5, rondo::graph::capacity(4));
+
+  auto result = g_directed.max_flow(0, 5);
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(result.value(), 23);
 }
