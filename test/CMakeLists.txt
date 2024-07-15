@@ -12,4 +12,6 @@ set(TEST_FILES "test.cpp")
 add_executable(${TEST_PROJECT_NAME} ${TEST_FILES})
 target_link_libraries(${TEST_PROJECT_NAME} gtest gtest_main ${PROJECT_NAME})
 
-add_test(NAME all COMMAND ${TEST_PROJECT_NAME})
+# Use gtest_discover_tests to add tests
+include(GoogleTest)
+gtest_discover_tests(${TEST_PROJECT_NAME})

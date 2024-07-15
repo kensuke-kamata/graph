@@ -34,6 +34,18 @@ int main() {
 }
 ```
 
+## Testing
+
+To enable and run the unit tests, configure the build with the `BUILD_RONDO_GRAPH_TEST` option set to `ON`. Follow these steps to compile and execute the tests:
+
+```bash
+mkdir build
+cd build
+cmake .. -D BUILD_RONDO_GRAPH_TEST=ON
+make
+ctest
+```
+
 ## Acknowledgements
 
 - Thanks to the developers of the `nlohmann::json` library for providing an excellent JSON handling library for modern C++.
