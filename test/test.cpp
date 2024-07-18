@@ -107,8 +107,10 @@ TEST_F(GraphTest, GetEdges) {
 
   auto edges = g_undirected.get_edges(v1);
   EXPECT_EQ(edges.size(), 1);
-  EXPECT_EQ(edges[0].first, v1);
-  EXPECT_EQ(edges[0].second, v2);
+
+  auto edge_it = edges.begin();
+  EXPECT_EQ(edge_it->first, v1);
+  EXPECT_EQ(edge_it->second, v2);
 }
 
 TEST_F(GraphTest, GetWeight) {

@@ -6,6 +6,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
+set(CMAKE_BUILD_TYPE Debug)
 set(TEST_PROJECT_NAME test-${PROJECT_NAME})
 set(TEST_FILES "test.cpp")
 

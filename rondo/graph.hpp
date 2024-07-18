@@ -5,11 +5,25 @@
 #include <algorithm>
 #include <fstream>
 #include <limits>
-#include <map>
+#include <mutex>
 #include <optional>
 #include <queue>
+#include <shared_mutex>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
+
+namespace std {
+template <>
+struct hash<std::pair<size_t, size_t>> {
+  size_t operator()(const std::pair<size_t, size_t> &p) const {
+    auto hash1 = std::hash<size_t>{}(p.first);
+    auto hash2 = std::hash<size_t>{}(p.second);
+    return hash1 ^ (hash2 << 1);
+  }
+};
+}
 
 namespace rondo {
 class graph {
@@ -18,14 +32,12 @@ class graph {
   using weight   = double_t;
   using capacity = size_t;
   using flow     = size_t;
-
-  using edge = std::pair<vertex, vertex>;
-  using path = std::map<vertex, vertex>; // e.g. path parent; then parent[v] = u means u -> v
-
+  using edge     = std::pair<vertex, vertex>;
+  using path     = std::unordered_map<vertex, vertex>; // e.g. path parent; then parent[v] = u means u -> v
   using function = std::function<void(const vertex &)>;
 
   template <typename T>
-  using matrix = std::map<vertex, std::map<vertex, T>>;
+  using matrix = std::unordered_map<vertex, std::unordered_map<vertex, T>>;
 
   static constexpr vertex VERTEX_END = std::numeric_limits<vertex>::max();
   static constexpr weight WEIGHT_INF = std::numeric_limits<weight>::infinity();
@@ -38,10 +50,10 @@ class graph {
       : label(label), color(color) {}
   };
 
-  using vertices   = std::map<vertex, property>;
-  using edges      = std::vector<edge>;
-  using weights    = std::map<edge, weight>;
-  using capacities = std::map<edge, capacity>;
+  using vertices   = std::unordered_map<vertex, property>;
+  using edges      = std::unordered_set<edge>;
+  using weights    = std::unordered_map<edge, weight>;
+  using capacities = std::unordered_map<edge, capacity>;
 
  private:
   vertices   vertices_   = {};
@@ -49,64 +61,94 @@ class graph {
   weights    weights_    = {};
   capacities capacities_ = {};
 
-  vertex next_ = VERTEX_END;
+  vertex next_ = 0;
   bool directed_ = false;
 
  public:
+  mutable std::shared_mutex mutex_;
+
   graph(bool directed = false) : directed_(directed) {}
 
+  graph(const graph &other)
+    : vertices_(other.vertices_), edges_(other.edges_), weights_(other.weights_),
+      capacities_(other.capacities_), next_(other.next_), directed_(other.directed_) {}
+
+  graph &operator=(const graph &other) {
+    if (this != &other) {
+      std::unique_lock lock_this(mutex_);
+      std::unique_lock lock_other(other.mutex_);
+      vertices_   = other.vertices_;
+      edges_      = other.edges_;
+      weights_    = other.weights_;
+      capacities_ = other.capacities_;
+      next_       = other.next_;
+      directed_   = other.directed_;
+    }
+    return *this;
+  }
+
   void clear() {
+    std::unique_lock lock(mutex_);
     vertices_.clear();
-    next_ = VERTEX_END;
+    edges_.clear();
+    weights_.clear();
+    capacities_.clear();
+    next_ = 0;
   }
 
   size_t size() const {
+    std::shared_lock lock(mutex_);
     return vertices_.size();
   }
 
   bool empty() const {
+    std::shared_lock lock(mutex_);
     return vertices_.empty();
   }
 
   edges operator[](const vertex &v) const {
+    std::shared_lock lock(mutex_);
     edges ret;
-    std::copy_if(edges_.begin(), edges_.end(), std::back_inserter(ret),
-                 [&v](const edge &e) {
+    std::copy_if(edges_.begin(), edges_.end(), std::inserter(ret, ret.end()), [&v](const edge &e) {
       return e.first == v;
     });
     return ret;
   }
 
   std::optional<property> operator()(const vertex &v) const {
+    std::shared_lock lock(mutex_);
     auto it = vertices_.find(v);
     if (it == vertices_.end()) {
       return std::nullopt;
     }
-    return vertices_.at(v);
+    return it->second;
   }
 
   vertices get_vertices() const {
+    std::shared_lock lock(mutex_);
     return vertices_;
   }
 
   edges get_edges(const vertex &v) const {
+    std::shared_lock lock(mutex_);
     edges ret;
-    std::copy_if(edges_.begin(), edges_.end(), std::back_inserter(ret),
-                 [&v](const edge &e) {
+    std::copy_if(edges_.begin(), edges_.end(), std::inserter(ret, ret.end()), [&v](const edge &e) {
       return e.first == v;
     });
     return ret;
   }
 
   std::optional<property> get_property(const vertex &v) const {
+    std::shared_lock lock(mutex_);
     auto it = vertices_.find(v);
     if (it == vertices_.end()) {
       return std::nullopt;
     }
-    return vertices_.at(v);
+    return it->second;
   }
 
   std::optional<weight> get_weight(const edge &e) const {
+    std::shared_lock lock(mutex_);
     auto it = weights_.find(e);
     if (it == weights_.end()) {
       return std::nullopt;
@@ -115,6 +157,7 @@ class graph {
   }
 
   std::optional<weight> get_weight(const vertex &from, const vertex &to) const {
+    std::shared_lock lock(mutex_);
     auto it = weights_.find(edge(from, to));
     if (it == weights_.end()) {
       return std::nullopt;
@@ -123,6 +166,7 @@ class graph {
   }
 
   std::optional<capacity> get_capacity(const edge &e) const {
+    std::shared_lock lock(mutex_);
     auto it = capacities_.find(e);
     if (it == capacities_.end()) {
       return std::nullopt;
@@ -131,6 +175,7 @@ class graph {
   }
 
   std::optional<capacity> get_capacity(const vertex &from, const vertex &to) const {
+    std::shared_lock lock(mutex_);
     auto it = capacities_.find(edge(from, to));
     if (it == capacities_.end()) {
       return std::nullopt;
@@ -139,6 +184,7 @@ class graph {
   }
 
   void set_property(const vertex &v, property p) {
+    std::unique_lock lock(mutex_);
     auto it = vertices_.find(v);
     if (it != vertices_.end()) {
       vertices_[v] = p;
@@ -146,15 +192,17 @@ class graph {
   }
 
   bool has_vertex(const vertex &v) const {
+    std::shared_lock lock(mutex_);
     return vertices_.find(v) != vertices_.end();
   }
 
   bool has_edge(const vertex &from, const vertex &to) const {
+    std::shared_lock lock(mutex_);
     return std::find(edges_.begin(), edges_.end(), edge(from, to)) != edges_.end();
   }
 
   vertex add_vertex(property p = property()) {
-    next_++;
+    std::unique_lock lock(mutex_);
     while (vertices_.find(next_) != vertices_.end()) {
       next_++;
     }
@@ -166,6 +214,7 @@ class graph {
   }
 
   vertex add_vertex(const vertex &v, property p = property()) {
+    std::unique_lock lock(mutex_);
     if (vertices_.find(v) != vertices_.end()) {
       throw std::runtime_error("vertex: already exists");
     }
@@ -207,6 +256,7 @@ class graph {
   }
 
   bool remove_edge(const vertex &from, const vertex &to) {
+    std::unique_lock lock(mutex_);
     bool removed = remove_helper(from, to);
     if (!directed_ && removed) {
       remove_helper(to, from);
@@ -241,6 +291,7 @@ class graph {
   }
 
   nlohmann::json to_json() const {
+    std::shared_lock lock(mutex_);
     nlohmann::json j;
     j["directed"] = directed_;
 
@@ -269,17 +320,19 @@ class graph {
   }
 
   void dfs(const vertex &start, const function &f) {
-    std::map<vertex, bool> visited;
+    std::shared_lock lock(mutex_);
+    std::unordered_map<vertex, bool> visited;
     dfs_helper(start, visited, f);
   }
 
   void bfs(vertex &start, const function &f) {
+    std::shared_lock lock(mutex_);
     auto it = vertices_.find(start);
     if (it == vertices_.end()) {
       return;
     }
 
-    std::map<vertex, bool> visited;
+    std::unordered_map<vertex, bool> visited;
     std::queue<vertex> q;
 
     visited[start] = true;
@@ -319,6 +372,7 @@ class graph {
   };
 
   result dijkstra(const vertex &start) const {
+    std::shared_lock lock(mutex_);
     std::priority_queue<std::pair<weight, vertex>,
                         std::vector<std::pair<weight, vertex>>,
                         std::greater<std::pair<weight, vertex>>> pq;
@@ -354,6 +408,7 @@ class graph {
   }
 
   result bellman_ford(const vertex &start) const {
+    std::shared_lock lock(mutex_);
     result res;
     for (const auto &pair : vertices_) {
       res.distances[pair.first]    = WEIGHT_INF;
@@ -413,6 +468,7 @@ class graph {
   };
 
   floyd_warshall_result floyd_warshall() const {
+    std::shared_lock lock(mutex_);
     floyd_warshall_result res;
     for (const auto &pair : vertices_) {
       auto u = pair.first;
@@ -453,11 +509,16 @@ class graph {
   }
 
   graph mst() {
+    std::shared_lock lock(mutex_);
+    if (vertices_.empty()) {
+      return graph();
+    }
     auto start = vertices_.begin()->first;
     return mst_helper(start);
   }
 
   graph mst(const vertex &start) {
+    std::shared_lock lock(mutex_);
     if (vertices_.find(start) == vertices_.end()) {
       return graph();
     }
@@ -478,7 +539,7 @@ class graph {
     edges es;
     for (const auto &e : residuals) {
       if (e.first.first == v) {
-        es.emplace_back(e.first);
+        es.emplace(e.first);
       }
     }
     return es;
@@ -486,7 +547,7 @@ class graph {
 
   path augment(const vertex &s, const vertex &t, capacities &residuals) {
     // Use breadth-first search to find an augmenting path
-    std::map<vertex, bool> visited;
+    std::unordered_map<vertex, bool> visited;
     std::queue<vertex> queue;
 
     queue.push(s);
@@ -512,6 +573,7 @@ class graph {
   }
 
   capacities gen_residuals() {
+    std::shared_lock lock(mutex_);
     capacities residuals = {};
     for (const auto &e : edges_) {
       auto c = get_capacity(e);
@@ -555,14 +617,16 @@ class graph {
 
  private:
   void add_edge_helper(const vertex &from, const vertex &to, const weight &w) {
+    std::unique_lock lock(mutex_);
     auto from_to = edge(from, to);
-    edges_.emplace_back(from_to);
+    edges_.emplace(from_to);
     weights_[from_to] = w;
   }
 
   void add_edge_helper(const vertex &from, const vertex &to, const capacity &c) {
+    std::unique_lock lock(mutex_);
     auto from_to = edge(from, to);
-    edges_.emplace_back(from_to);
+    edges_.emplace(from_to);
     capacities_[from_to] = c;
   }
 
@@ -573,12 +637,13 @@ class graph {
     if (it != edges_.end()) {
       edges_.erase(it);
       weights_.erase(from_to);
+      capacities_.erase(from_to);
       removed = true;
     }
     return removed;
   }
 
-  void dfs_helper(const vertex &v, std::map<vertex, bool> &visited, const function &f) {
+  void dfs_helper(const vertex &v, std::unordered_map<vertex, bool> &visited, const function &f) {
     auto it = vertices_.find(v);
     if (it == vertices_.end()) {
       return;

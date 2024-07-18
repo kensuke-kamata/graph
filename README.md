@@ -41,9 +41,15 @@ To enable and run the unit tests, configure the build with the `BUILD_RONDO_GRAP
 ```bash
 mkdir build
 cd build
-cmake .. -D BUILD_RONDO_GRAPH_TEST=ON
+cmake .. -DBUILD_RONDO_GRAPH_TEST=ON -DCMAKE_BUILD_TYPE=Debug
 make
 ctest
+```
+Debug the test with `lldb`:
+
+```bash
+cd build
+lldb -- ./test/test-rondo-graph --gtest_filter=GraphTest.<TestName>
 ```
 
 ## Acknowledgements
