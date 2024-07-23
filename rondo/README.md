@@ -82,44 +82,43 @@ BFS is a traversal algorithm that explores all vertices at the present depth lev
 ### Dijkstra Algorithm
 Dijkstra's algorithm is used to find the shortest path from a starting vertex to all other vertices in a graph. This algorithm is particularly effective for graphs with positive weights. It references all edges in a breadth-first manner while using a priority queue to account for edge weights to find the shortest path.
 
-#### Initialization
+**Initialization**
 - Set the distance to each vertex to infinity (`WEIGHT_INF`), except for the starting vertex (`start`), which is set to 0.
 - Create a map to record predecessors (`predecessors`), setting the predecessor of every vertex to a special value (e.g., `VERTEX_END`).
 
-#### Priority Queue
+**Priority Queue**
 - Use a priority queue (`priority_queue`) to always retrieve the vertex with the shortest distance.
 - This queue stores pairs of distance and vertex (`std::pair<weight, vertex>`).
 
-#### Main Loop
+**Main Loop**
 - Extract vertices from the queue and examine all edges extending from those vertices.
 - If a new distance is shorter than the known distance, update the distance and predecessor, then add the new distance and vertex to the queue.
 
-#### Termination Condition
+**Termination Condition**
 - Once the queue is empty, the shortest paths to all vertices are determined.
 
-#### Computational Complexity
+**Computational Complexity**
 - The initial loop to construct the priority queue performs insertions $V$ times, resulting in a complexity of $O(V \log V)$.
 - The subsequent `while` loop visits each edge once and is called at most $E$ times, resulting in a complexity of $O(E \log V)$.
 - The overall complexity is $O((V + E) \log V)$.
 
 ### Bellman-Ford Algorithm
-
 The Bellman-Ford algorithm is used to find the shortest paths from a single source vertex to all other vertices in a weighted graph. It can handle graphs with negative weights and can detect negative weight cycles.
 
-#### Initialization
+**Initialization**
 - Set the distance to each vertex to infinity (`WEIGHT_INF`), except for the starting vertex (`start`), which is set to 0.
 - Set the predecessor of each vertex to a special value (`VERTEX_END`).
 
-#### Relaxation
+**Relaxation**
 - Iterate over all edges $|V| - 1$ times, where $|V|$ is the number of vertices.
 - Update the distance to the destination vertex for each edge if a shorter path is found.
 - Terminate early if no updates occur in an iteration, indicating that the shortest paths have been found.
 
 > The shortest path in a graph consists of at most $|V| - 1$ edges, provided the path does not exceed the total number of vertices $|V|$. This is true for simple paths (paths without cycles). The distance to each vertex on the shortest path can be accurately updated with at most $|V| - 1$ edge relaxation operations.
 
-#### Negative Cycle Detection
+**Negative Cycle Detection**
 - After `|V| - 1` iterations, if any distance can still be updated, a negative weight cycle exists.
 
-#### Computational Complexity
+**Computational Complexity**
 - Nested loops result in $O(V*E)$
 - Slower than Dijkstra's algorithm, which is ($O((V + E) \log V)$)
