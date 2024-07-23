@@ -325,6 +325,25 @@ class graph {
     dfs_helper(start, visited, f);
   }
 
+ private:
+  void dfs_helper(const vertex &v, std::unordered_map<vertex, bool> &visited, const function &f) {
+    auto it = vertices_.find(v);
+    if (it == vertices_.end()) {
+      return;
+    }
+
+    visited[v] = true;
+    f(v);
+
+    auto edges = get_edges(v);
+    for (auto &edge : edges) {
+      if (!visited[edge.second]) {
+        dfs_helper(edge.second, visited, f);
+      }
+    }
+  }
+
+ public:
   void bfs(vertex &start, const function &f) {
     std::shared_lock lock(mutex_);
     auto it = vertices_.find(start);
@@ -354,52 +373,48 @@ class graph {
     }
   }
 
-  struct result {
-    std::map<vertex, weight> distances    = {};
-    std::map<vertex, vertex> predecessors = {};
-
-    std::vector<vertex> path_to(const vertex &end) {
-      std::vector<vertex> path;
-      if (predecessors.find(end) == predecessors.end()) {
-        return path;
-      }
-      for (auto it = end; it != VERTEX_END; it = predecessors.at(it)) {
-        path.emplace_back(it);
-      }
-      std::reverse(path.begin(), path.end());
+  static std::vector<vertex> path_to(const std::unordered_map<vertex, std::pair<weight, vertex>> &map, const vertex &end) {
+    std::vector<vertex> path;
+    if (map.find(end) == map.end()) {
       return path;
     }
-  };
-
-  result dijkstra(const vertex &start) const {
-    std::shared_lock lock(mutex_);
-    std::priority_queue<std::pair<weight, vertex>,
-                        std::vector<std::pair<weight, vertex>>,
-                        std::greater<std::pair<weight, vertex>>> pq;
-
-    result res;
-    for (const auto &pair : vertices_) {
-      res.distances[pair.first]    = WEIGHT_INF;
-      res.predecessors[pair.first] = VERTEX_END;
+    for (auto it = end; it != VERTEX_END; it = map.at(it).second) {
+      path.emplace_back(it);
     }
+    std::reverse(path.begin(), path.end());
+    return path;
+  }
 
-    res.distances[start] = 0;
+  std::unordered_map<vertex, std::pair<weight, vertex>> dijkstra(const vertex &start) const {
+    std::priority_queue<
+      std::pair<weight, vertex>,
+      std::vector<std::pair<weight, vertex>>,
+      std::greater<std::pair<weight, vertex>>
+    > pq;
+    std::unordered_map<vertex, std::pair<weight, vertex>> res;
+
+    std::shared_lock lock(mutex_);
+    for (const auto &pair : vertices_) {
+      res[pair.first].first  = WEIGHT_INF;
+      res[pair.first].second = VERTEX_END;
+    }
+    res[start].first = 0;
     pq.emplace(0, start);
 
     while (!pq.empty()) {
       auto [d, u] = pq.top();
       pq.pop();
-
-      if (d > res.distances[u]) { continue; }
-
+      if (d > res[u].first) {
+        continue;
+      }
       auto edges = get_edges(u);
       for (const auto &edge : edges) {
         auto v = edge.second;
         auto w = get_weight(u, v).value();
-        auto alt = res.distances[u] + w;
-        if (alt < res.distances[v]) {
-          res.distances[v]    = alt;
-          res.predecessors[v] = u;
+        auto alt = res[u].first + w;
+        if (alt < res[v].first) {
+          res[v].first  = alt;
+          res[v].second = u;
           pq.emplace(alt, v);
         }
       }
@@ -407,14 +422,15 @@ class graph {
     return res;
   }
 
-  result bellman_ford(const vertex &start) const {
+  std::unordered_map<vertex, std::pair<weight, vertex>> bellman_ford(const vertex &start) const {
+    std::unordered_map<vertex, std::pair<weight, vertex>> res;
+
     std::shared_lock lock(mutex_);
-    result res;
     for (const auto &pair : vertices_) {
-      res.distances[pair.first]    = WEIGHT_INF;
-      res.predecessors[pair.first] = VERTEX_END;
+      res[pair.first].first  = WEIGHT_INF;
+      res[pair.first].second = VERTEX_END;
     }
-    res.distances[start] = 0;
+    res[start].first = 0;
 
     for (size_t i = 0; i < vertices_.size(); i++) {
       auto updated = false;
@@ -422,10 +438,10 @@ class graph {
         auto u = edge.first;
         auto v = edge.second;
         auto w = get_weight(u, v).value();
-        auto alt = res.distances[u] + w;
-        if (alt < res.distances[v]) {
-          res.distances[v]    = alt;
-          res.predecessors[v] = u;
+        auto alt = res[u].first + w;
+        if (alt < res[v].first) {
+          res[v].first  = alt;
+          res[v].second = u;
           updated = true;
         }
       }
@@ -641,23 +657,6 @@ class graph {
       removed = true;
     }
     return removed;
-  }
-
-  void dfs_helper(const vertex &v, std::unordered_map<vertex, bool> &visited, const function &f) {
-    auto it = vertices_.find(v);
-    if (it == vertices_.end()) {
-      return;
-    }
-
-    visited[v] = true;
-    f(v);
-
-    auto edges = get_edges(v);
-    for (auto &edge : edges) {
-      if (!visited[edge.second]) {
-        dfs_helper(edge.second, visited, f);
-      }
-    }
   }
 
   graph mst_helper(const vertex &start) {

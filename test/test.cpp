@@ -223,10 +223,10 @@ TEST_F(GraphTest, DijkstraShortestPath) {
 
   auto result = g_directed.dijkstra(v1);
 
-  std::vector<rondo::graph::vertex> path_to_v4 = result.path_to(v4);
+  std::vector<rondo::graph::vertex> path_to_v4 = rondo::graph::path_to(result, v4);
   std::vector<rondo::graph::vertex> expected_path = {v1, v2, v3, v4};
   EXPECT_EQ(path_to_v4, expected_path);
-  EXPECT_DOUBLE_EQ(result.distances[v4], 3);
+  EXPECT_DOUBLE_EQ(result[v4].first, 3);
 }
 
 TEST_F(GraphTest, BellmanFordShortestPath) {
@@ -253,18 +253,18 @@ TEST_F(GraphTest, BellmanFordShortestPath) {
   auto result = g_directed.bellman_ford(v0);
 
   // Check distances
-  EXPECT_DOUBLE_EQ(result.distances[v0], 0);
-  EXPECT_DOUBLE_EQ(result.distances[v1], 2);
-  EXPECT_DOUBLE_EQ(result.distances[v2], 7);
-  EXPECT_DOUBLE_EQ(result.distances[v3], 4);
-  EXPECT_DOUBLE_EQ(result.distances[v4], -2);
+  EXPECT_DOUBLE_EQ(result[v0].first, 0);
+  EXPECT_DOUBLE_EQ(result[v1].first, 2);
+  EXPECT_DOUBLE_EQ(result[v2].first, 7);
+  EXPECT_DOUBLE_EQ(result[v3].first, 4);
+  EXPECT_DOUBLE_EQ(result[v4].first, -2);
 
   // Check predecessors
-  EXPECT_EQ(result.predecessors[v0], rondo::graph::VERTEX_END);
-  EXPECT_EQ(result.predecessors[v1], v3);
-  EXPECT_EQ(result.predecessors[v2], v0);
-  EXPECT_EQ(result.predecessors[v3], v2);
-  EXPECT_EQ(result.predecessors[v4], v1);
+  EXPECT_EQ(result[v0].second, rondo::graph::VERTEX_END);
+  EXPECT_EQ(result[v1].second, v3);
+  EXPECT_EQ(result[v2].second, v0);
+  EXPECT_EQ(result[v3].second, v2);
+  EXPECT_EQ(result[v4].second, v1);
 }
 
 TEST_F(GraphTest, BellmanFordEarlyExit) {
@@ -281,14 +281,14 @@ TEST_F(GraphTest, BellmanFordEarlyExit) {
   auto result = g_directed.bellman_ford(v0);
 
   // Check distances
-  EXPECT_DOUBLE_EQ(result.distances[v0], 0);
-  EXPECT_DOUBLE_EQ(result.distances[v1], 4);
-  EXPECT_DOUBLE_EQ(result.distances[v2], -2);
+  EXPECT_DOUBLE_EQ(result[v0].first, 0);
+  EXPECT_DOUBLE_EQ(result[v1].first, 4);
+  EXPECT_DOUBLE_EQ(result[v2].first, -2);
 
   // Check predecessors
-  EXPECT_EQ(result.predecessors[v0], rondo::graph::VERTEX_END);
-  EXPECT_EQ(result.predecessors[v1], v0);
-  EXPECT_EQ(result.predecessors[v2], v1);
+  EXPECT_EQ(result[v0].second, rondo::graph::VERTEX_END);
+  EXPECT_EQ(result[v1].second, v0);
+  EXPECT_EQ(result[v2].second, v1);
 }
 
 TEST_F(GraphTest, BellmanFordNegativeCycle) {
