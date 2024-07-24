@@ -255,6 +255,22 @@ class graph {
     }
   }
 
+ private:
+  void add_edge_helper(const vertex &from, const vertex &to, const weight &w) {
+    std::unique_lock lock(mutex_);
+    auto from_to = edge(from, to);
+    edges_.emplace(from_to);
+    weights_[from_to] = w;
+  }
+
+  void add_edge_helper(const vertex &from, const vertex &to, const capacity &c) {
+    std::unique_lock lock(mutex_);
+    auto from_to = edge(from, to);
+    edges_.emplace(from_to);
+    capacities_[from_to] = c;
+  }
+
+ public:
   bool remove_edge(const vertex &from, const vertex &to) {
     std::unique_lock lock(mutex_);
     bool removed = remove_helper(from, to);
@@ -264,6 +280,21 @@ class graph {
     return removed;
   }
 
+ private:
+  bool remove_helper(const vertex &from, const vertex &to) {
+    bool removed = false;
+    auto from_to = edge(from, to);
+    auto it = std::find(edges_.begin(), edges_.end(), from_to);
+    if (it != edges_.end()) {
+      edges_.erase(it);
+      weights_.erase(from_to);
+      capacities_.erase(from_to);
+      removed = true;
+    }
+    return removed;
+  }
+
+ public:
   void from_json(const std::string &path) {
     std::ifstream fs(path);
     if (!fs.is_open()) {
@@ -506,14 +537,12 @@ class graph {
         }
       }
     }
-
     for (const auto &pair : vertices_) {
       auto u = pair.first;
       if (res.first[u][u] < 0) {
         throw std::runtime_error("negative cycle detected");
       }
     }
-
     return res;
   }
 
@@ -532,6 +561,81 @@ class graph {
       return graph();
     }
     return mst_helper(start);
+  }
+
+ private:
+  graph mst_helper(const vertex &start) {
+    if (directed_) {
+      throw std::runtime_error("mst: directed graph");
+    }
+    graph g;
+    if (empty()) {
+      return g;
+    }
+    std::map<vertex, bool> visited;
+    for (const auto &pair : vertices_) {
+      visited[pair.first] = false;
+    }
+    auto cmp = [](const std::pair<weight, edge>& left,
+                  const std::pair<weight, edge>& right) {
+      return left.first > right.first;
+    };
+    std::priority_queue<
+      std::pair<weight, edge>,
+      std::vector<std::pair<weight, edge>>,
+      decltype(cmp)
+    > pq(cmp);
+
+    visited[start] = true;
+    g.add_vertex(start, vertices_.at(start));
+    for (const auto &edge : get_edges(start)) {
+      pq.emplace(get_weight(edge).value(), edge);
+    }
+
+    while (!pq.empty()) {
+      auto p = pq.top();
+      auto w = p.first;
+      auto u = p.second.first;
+      auto v = p.second.second;
+      pq.pop();
+      if (visited[v]) { continue; }
+      visited[v] = true;
+      g.add_vertex(v, vertices_.at(v));
+      g.add_edge(u, v, w);
+      for (const auto &edge : get_edges(v)) {
+        if (!visited[edge.second]) {
+          pq.emplace(get_weight(edge).value(), edge);
+        }
+      }
+    }
+    return g;
+  }
+
+ public:
+  // Ford-Fulkerson max flow algorithm using DFS
+  std::optional<flow> max_flow(const vertex &s, const vertex &t) {
+    if (!directed_) {
+      return std::nullopt;
+    }
+    if (!has_vertex(s) || !has_vertex(t)) {
+      return  std::nullopt;
+    }
+    capacities residuals = gen_residuals();
+    flow result = 0;
+    while (true) {
+      path parent = augment(s, t, residuals);
+      if (parent.find(t) == parent.end()) {
+        break;
+      }
+      flow b = bottleneck(s, t, residuals, parent);
+      for (auto v = t; v != s; v = parent.at(v)) {
+        auto u = parent.at(v);
+        residuals.at(edge(u, v)) -= b; // Decrease residual capacity of forward edge
+        residuals.at(edge(v, u)) += b; // Increase residual capacity of reverse edge
+      }
+      result += b;
+    }
+    return result;
   }
 
  private:
@@ -595,114 +699,6 @@ class graph {
       }
     }
     return residuals;
-  }
-
- public:
-  // Ford-Fulkerson max flow algorithm using DFS
-  std::optional<flow> max_flow(const vertex &s, const vertex &t) {
-    if (!directed_) {
-      return std::nullopt;
-    }
-    if (!has_vertex(s) || !has_vertex(t)) {
-      return  std::nullopt;
-    }
-    capacities residuals = gen_residuals();
-    flow result = 0;
-    while (true) {
-      path parent = augment(s, t, residuals);
-      if (parent.find(t) == parent.end()) {
-        break;
-      }
-      flow b = bottleneck(s, t, residuals, parent);
-      for (auto v = t; v != s; v = parent.at(v)) {
-        auto u = parent.at(v);
-        residuals.at(edge(u, v)) -= b; // Decrease residual capacity of forward edge
-        residuals.at(edge(v, u)) += b; // Increase residual capacity of reverse edge
-      }
-      result += b;
-    }
-    return result;
-  }
-
- private:
-  void add_edge_helper(const vertex &from, const vertex &to, const weight &w) {
-    std::unique_lock lock(mutex_);
-    auto from_to = edge(from, to);
-    edges_.emplace(from_to);
-    weights_[from_to] = w;
-  }
-
-  void add_edge_helper(const vertex &from, const vertex &to, const capacity &c) {
-    std::unique_lock lock(mutex_);
-    auto from_to = edge(from, to);
-    edges_.emplace(from_to);
-    capacities_[from_to] = c;
-  }
-
-  bool remove_helper(const vertex &from, const vertex &to) {
-    bool removed = false;
-    auto from_to = edge(from, to);
-    auto it = std::find(edges_.begin(), edges_.end(), from_to);
-    if (it != edges_.end()) {
-      edges_.erase(it);
-      weights_.erase(from_to);
-      capacities_.erase(from_to);
-      removed = true;
-    }
-    return removed;
-  }
-
-  graph mst_helper(const vertex &start) {
-    if (directed_) {
-      throw std::runtime_error("mst: directed graph");
-    }
-
-    graph g;
-
-    if (empty()) {
-      return g;
-    }
-
-    std::map<vertex, bool> visited;
-    for (const auto &pair : vertices_) {
-      visited[pair.first] = false;
-    }
-
-    auto cmp = [](const std::pair<weight, edge>& left,
-                  const std::pair<weight, edge>& right) {
-      return left.first > right.first;
-    };
-    std::priority_queue<std::pair<weight, edge>,
-                        std::vector<std::pair<weight, edge>>,
-                        decltype(cmp)> pq(cmp);
-
-    visited[start] = true;
-    g.add_vertex(start, vertices_.at(start));
-
-    for (const auto &edge : get_edges(start)) {
-      pq.emplace(get_weight(edge).value(), edge);
-    }
-
-    while (!pq.empty()) {
-      auto p = pq.top();
-      auto w = p.first;
-      auto u = p.second.first;
-      auto v = p.second.second;
-      pq.pop();
-
-      if (visited[v]) { continue; }
-
-      visited[v] = true;
-      g.add_vertex(v, vertices_.at(v));
-      g.add_edge(u, v, w);
-
-      for (const auto &edge : get_edges(v)) {
-        if (!visited[edge.second]) {
-          pq.emplace(get_weight(edge).value(), edge);
-        }
-      }
-    }
-    return g;
   }
 };
 }  // namespace rondo

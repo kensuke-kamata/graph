@@ -123,7 +123,7 @@ The Bellman-Ford algorithm is used to find the shortest paths from a single sour
 - Nested loops result in $O(V*E)$
 - Slower than Dijkstra's algorithm, which is ($O((V + E) \log V)$)
 
-## Floyd-Warshall Algorithm
+### Floyd-Warshall Algorithm
 The Floyd-Warshall algorithm finds the shortest paths between all pairs of vertices in a weighted graph, which may include negative weights but must not contain negative weight cycles. It computes the shortest distances and paths between all vertices simultaneously, making it suitable for dense graphs. It is ideal in scenarios where pre-computed shortest paths are needed for all locations.
 
 > Implementing single-source shortest path algorithms (like Dijkstra's or Bellman-Ford) for all vertices can yield results similar to the Floyd-Warshall algorithm.
@@ -148,3 +148,26 @@ Floyd-Warshall is a type of dynamic programming algorithm, memorizing the (compu
 
 **Computational Complexity**
 - The three nested loops result in a complexity of $O(V^3)$.
+
+### Prim's Algorithm
+
+Prim's Algorithm is designed to find the minimum spanning tree (MST) in a connected, undirected graph using a greedy approach without reversing previous decisions. The MST is a subset of the edges that connects all vertices with the minimum possible total edge weight, without forming any cycles. The algorithm incrementally adds edges to the spanning tree T until the MST is complete.
+
+**Initialization**
+- Start with a selected vertex (arbitrarily chosen if not specified).
+- Initialize a priority queue to hold the edges, sorted by their weights.
+- Mark the selected vertex as visited and add all its edges to the priority queue.
+
+**Process**
+While the priority queue is not empty:
+- Remove the edge with the smallest weight from the priority queue.
+- If the edge connects to an unvisited vertex:
+  - Add the vertex to the MST and mark it as visited.
+  - Add the vertex to the growing spanning tree.
+  - Insert all new edges from this vertex into the priority queue, considering only those that connect to unvisited vertices.
+
+**Edge Selection**
+The algorithm selects edges in increasing order of weight, ensuring that no cycles are formed. This is guaranteed by only considering edges that connect to unvisited vertices.
+
+**Computational Complexity**
+- Using a priority queue leads to a complexity of $O((V+E)\log V)$, where V is the number of vertices and E is the number of edges.
