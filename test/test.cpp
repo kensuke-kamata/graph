@@ -322,7 +322,7 @@ TEST_F(GraphTest, FloydWarshallZeroEdges) {
   auto v1 = g_directed.add_vertex();
 
   auto result = g_directed.floyd_warshall();
-  EXPECT_FALSE(result.distance(v0, v1).has_value());
+  EXPECT_FALSE(rondo::graph::get_distance(result.first, v0, v1).has_value());
 }
 
 TEST_F(GraphTest, FloydWarshallSelfLoop) {
@@ -330,10 +330,10 @@ TEST_F(GraphTest, FloydWarshallSelfLoop) {
   g_directed.add_edge(v0, v0, rondo::graph::weight(1));
 
   auto result = g_directed.floyd_warshall();
-  EXPECT_DOUBLE_EQ(result.distance(v0, v0).value(), 0);
+  EXPECT_DOUBLE_EQ(rondo::graph::get_distance(result.first, v0, v0).value(), 0);
 
   std::vector<rondo::graph::vertex> expect = {v0};
-  EXPECT_EQ(result.path(v0, v0), expect);
+  EXPECT_EQ(rondo::graph::get_path(result.second, v0, v0), expect);
 }
 
 TEST_F(GraphTest, FloydWarshallMaximumWeight) {
@@ -342,14 +342,14 @@ TEST_F(GraphTest, FloydWarshallMaximumWeight) {
   g_directed.add_edge(v0, v1, rondo::graph::WEIGHT_INF);
 
   auto result = g_directed.floyd_warshall();
-  EXPECT_DOUBLE_EQ(result.distance(v0, v1).value(), rondo::graph::WEIGHT_INF);
+  EXPECT_DOUBLE_EQ(rondo::graph::get_distance(result.first, v0, v1).value(), rondo::graph::WEIGHT_INF);
 }
 
 TEST_F(GraphTest, FloydWarshallSingleVertex) {
   auto v0 = g_directed.add_vertex();
 
   auto result = g_directed.floyd_warshall();
-  EXPECT_DOUBLE_EQ(result.distance(v0, v0).value(), 0);
+  EXPECT_DOUBLE_EQ(rondo::graph::get_distance(result.first, v0, v0).value(), 0);
 }
 
 TEST_F(GraphTest, FloydWarshallDisconnectedGraph) {
@@ -358,9 +358,9 @@ TEST_F(GraphTest, FloydWarshallDisconnectedGraph) {
   g_directed.add_edge(v0, v1, 1.0);
 
   auto result = g_directed.floyd_warshall();
-  EXPECT_TRUE(result.distance(v0, v1).has_value());
-  EXPECT_FALSE(result.distance(v1, v0).has_value());
-  EXPECT_TRUE(result.path(v1, v0).empty());
+  EXPECT_TRUE(rondo::graph::get_distance(result.first, v0, v1).has_value());
+  EXPECT_FALSE(rondo::graph::get_distance(result.first, v1, v0).has_value());
+  EXPECT_TRUE(rondo::graph::get_path(result.second, v1, v0).empty());
 }
 
 TEST_F(GraphTest, FloydWarshallNegativeCycleTwoVertices) {
@@ -404,12 +404,11 @@ TEST_F(GraphTest, FloydWarshall) {
 
   auto result = g_directed.floyd_warshall();
 
-  // dist.at(from).at(to)
-  EXPECT_DOUBLE_EQ(result.distance(v0, v0).value(), 0);
-  EXPECT_DOUBLE_EQ(result.distance(v0, v1).value(), 5);
+  EXPECT_DOUBLE_EQ(rondo::graph::get_distance(result.first, v0, v0).value(), 0);
+  EXPECT_DOUBLE_EQ(rondo::graph::get_distance(result.first, v0, v1).value(), 5);
 
   std::vector<rondo::graph::vertex> expect = {v0, v2, v3, v4, v5, v1};
-  EXPECT_EQ(result.path(v0, v1), expect);
+  EXPECT_EQ(rondo::graph::get_path(result.second, v0, v1), expect);
 }
 
 TEST_F(GraphTest, MST_EmptyGraph) {

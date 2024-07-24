@@ -453,61 +453,54 @@ class graph {
     return res;
   }
 
-  struct floyd_warshall_result {
-    matrix<weight> dist = {};
-    matrix<vertex> pred = {};
-
-    std::optional<weight> distance(const vertex &from, const vertex &to) const {
-      if (dist.find(from) == dist.end() ||
-          dist.at(from).find(to) == dist.at(from).end()) {
-        return std::nullopt;
-      }
-      return dist.at(from).at(to);
+  static std::optional<weight> get_distance(const matrix<weight> &dist, const vertex &from, const vertex &to) {
+    if (dist.find(from) == dist.end() ||
+        dist.at(from).find(to) == dist.at(from).end()) {
+      return std::nullopt;
     }
+    return dist.at(from).at(to);
+  }
 
-    std::vector<vertex> path(const vertex &from, const vertex &to) {
-      std::vector<vertex> p;
-      if (pred.find(from) == pred.end() ||
-          pred.at(from).find(to) == pred.at(from).end()) {
-        return p;
-      }
-
-      auto iter = to;
-      while (iter != from) {
-        p.emplace_back(iter);
-        iter = pred.at(from).at(iter);
-      }
-      p.emplace_back(from);
-      std::reverse(p.begin(), p.end());
+  static std::vector<vertex> get_path(const matrix<vertex> &pred, const vertex &from, const vertex &to) {
+    std::vector<vertex> p;
+    if (pred.find(from) == pred.end() ||
+        pred.at(from).find(to) == pred.at(from).end()) {
       return p;
     }
-  };
+    auto iter = to;
+    while (iter != from) {
+      p.emplace_back(iter);
+      iter = pred.at(from).at(iter);
+    }
+    p.emplace_back(from);
+    std::reverse(p.begin(), p.end());
+    return p;
+  }
 
-  floyd_warshall_result floyd_warshall() const {
+  std::pair<matrix<weight>, matrix<vertex>> floyd_warshall() const {
+    std::pair<matrix<weight>, matrix<vertex>> res;
     std::shared_lock lock(mutex_);
-    floyd_warshall_result res;
     for (const auto &pair : vertices_) {
       auto u = pair.first;
       for (const auto &edge : get_edges(u)) {
         auto v = edge.second;
         auto w = get_weight(u, v).value();
-        res.dist[u][v] = w;
-        res.pred[u][v] = u;
+        res.first[u][v] = w;
+        res.second[u][v] = u;
       }
-      res.dist[u][u] = 0;
+      res.first[u][u] = 0;
     }
-
     for (const auto &k_pair : vertices_) {
       for (const auto &i_pair : vertices_) {
         for (const auto &j_pair : vertices_) {
           auto k = k_pair.first, i = i_pair.first, j = j_pair.first;
-          if (res.dist.at(i).find(k) != res.dist.at(i).end() &&
-              res.dist.at(k).find(j) != res.dist.at(k).end()) {
-            auto alt = res.dist.at(i).at(k) + res.dist.at(k).at(j);
-            if (res.dist.at(i).find(j) == res.dist.at(i).end() ||
-                alt < res.dist[i][j]) {
-              res.dist[i][j] = alt;
-              res.pred[i][j] = res.pred[k][j];
+          if (res.first.at(i).find(k) != res.first.at(i).end() &&
+              res.first.at(k).find(j) != res.first.at(k).end()) {
+            auto alt = res.first.at(i).at(k) + res.first.at(k).at(j);
+            if (res.first.at(i).find(j) == res.first.at(i).end() ||
+                alt < res.first[i][j]) {
+              res.first[i][j] = alt;
+              res.second[i][j] = res.second[k][j];
             }
           }
         }
@@ -516,7 +509,7 @@ class graph {
 
     for (const auto &pair : vertices_) {
       auto u = pair.first;
-      if (res.dist[u][u] < 0) {
+      if (res.first[u][u] < 0) {
         throw std::runtime_error("negative cycle detected");
       }
     }

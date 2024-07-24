@@ -80,7 +80,7 @@ bfs(vertex &start, const function &f);
 BFS is a traversal algorithm that explores all vertices at the present depth level before moving on to vertices at the next level. It is particularly useful to finding the shortest path in unweighted graphs, level-order traversal, and for tasks that require visiting nodes layer by layer. The algorithm begins by marking the start vertex as visitged and pushing it onto the queue. It then enters a loop where it processes each vertex in the queue: marking its neighbors as visited, and adding them to the queue for futher processing.
 
 ### Dijkstra Algorithm
-Dijkstra's algorithm is used to find the shortest path from a starting vertex to all other vertices in a graph. This algorithm is particularly effective for graphs with positive weights. It references all edges in a breadth-first manner while using a priority queue to account for edge weights to find the shortest path.
+The Dijkstra's algorithm is used to find the shortest path from a starting vertex to all other vertices in a graph. This algorithm is particularly effective for graphs with positive weights. It references all edges in a breadth-first manner while using a priority queue to account for edge weights to find the shortest path.
 
 **Initialization**
 - Set the distance to each vertex to infinity (`WEIGHT_INF`), except for the starting vertex (`start`), which is set to 0.
@@ -122,3 +122,29 @@ The Bellman-Ford algorithm is used to find the shortest paths from a single sour
 **Computational Complexity**
 - Nested loops result in $O(V*E)$
 - Slower than Dijkstra's algorithm, which is ($O((V + E) \log V)$)
+
+## Floyd-Warshall Algorithm
+The Floyd-Warshall algorithm finds the shortest paths between all pairs of vertices in a weighted graph, which may include negative weights but must not contain negative weight cycles. It computes the shortest distances and paths between all vertices simultaneously, making it suitable for dense graphs. It is ideal in scenarios where pre-computed shortest paths are needed for all locations.
+
+> Implementing single-source shortest path algorithms (like Dijkstra's or Bellman-Ford) for all vertices can yield results similar to the Floyd-Warshall algorithm.
+
+Floyd-Warshall is a type of dynamic programming algorithm, memorizing the (computed) shortest distances and predecessors for each pair of vertices in two matrices.
+
+**Initialization**
+- Initialize the distance matrix `dist`:
+  - `dist[i][i]` is set to 0 (self-loop).
+  - `dist[i][j]` is set to the weight of edge `(i, j)`.
+  - If no edge exists, set it to a large value like infinity.
+- Initialize the predecessor matrix `pred`:
+  - `pred[i][j]` is set to the vertex `i`.
+
+**Dynamic Programming**
+- Use three nested loops to test all vertex pairs `i, j` with each intermediate vertex `k` one by one.
+- Check if `dist[i][j]` can be updated via `dist[i][k] + dist[k][j]`.
+- If an update is possible, set `dist[i][j]` to the new distance and update `pred[i][j]` to `pred[k][j]`.
+
+**Negative Cycle Detection**
+- If any diagonal element `dist[i][i]` becomes negative, a negative weight cycle exists.
+
+**Computational Complexity**
+- The three nested loops result in a complexity of $O(V^3)$.
