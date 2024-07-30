@@ -572,7 +572,7 @@ class graph {
     if (empty()) {
       return g;
     }
-    std::map<vertex, bool> visited;
+    std::unordered_map<vertex, bool> visited;
     for (const auto &pair : vertices_) {
       visited[pair.first] = false;
     }
@@ -612,7 +612,6 @@ class graph {
   }
 
  public:
-  // Ford-Fulkerson max flow algorithm using DFS
   std::optional<flow> max_flow(const vertex &s, const vertex &t) {
     if (!directed_) {
       return std::nullopt;
@@ -639,52 +638,6 @@ class graph {
   }
 
  private:
-  flow bottleneck(const vertex &s, const vertex &t, capacities &residuals, path &parent) {
-    flow b = std::numeric_limits<flow>::max();
-    for (auto v = t; v != s; v = parent.at(v)) {
-      auto u = parent.at(v);
-      b = std::min(b, residuals.at(edge(u, v)));
-    }
-    return b;
-  }
-
-  edges get_edges(const vertex &v, capacities &residuals) {
-    edges es;
-    for (const auto &e : residuals) {
-      if (e.first.first == v) {
-        es.emplace(e.first);
-      }
-    }
-    return es;
-  }
-
-  path augment(const vertex &s, const vertex &t, capacities &residuals) {
-    // Use breadth-first search to find an augmenting path
-    std::unordered_map<vertex, bool> visited;
-    std::queue<vertex> queue;
-
-    queue.push(s);
-    visited[s] = true;
-
-    path parent = {};
-    while(!queue.empty()) {
-      auto u = queue.front();
-      queue.pop();
-      if (u == t) {
-        return parent;
-      }
-      for (const auto &e : get_edges(u, residuals)) {
-        auto v  = e.second;
-        if (!visited[v] && residuals.at(e) > 0) {
-          visited[v] = true;
-          parent[v]  = u; // Record the path
-          queue.push(v);
-        }
-      }
-    }
-    return parent;
-  }
-
   capacities gen_residuals() {
     std::shared_lock lock(mutex_);
     capacities residuals = {};
@@ -699,6 +652,51 @@ class graph {
       }
     }
     return residuals;
+  }
+
+  edges get_edges(const vertex &v, capacities &residuals) {
+    edges es;
+    for (const auto &e : residuals) {
+      if (e.first.first == v) {
+        es.emplace(e.first);
+      }
+    }
+    return es;
+  }
+
+  path augment(const vertex &s, const vertex &t, capacities &residuals) {
+    std::unordered_map<vertex, bool> visited;
+    std::queue<vertex> queue;
+
+    queue.push(s);
+    visited[s] = true;
+
+    path parent = {};
+    while(!queue.empty()) {
+      auto u = queue.front();
+      queue.pop();
+      if (u == t) {
+        return parent;
+      }
+      for (const auto &e : get_edges(u, residuals)) {
+        auto v = e.second;
+        if (!visited[v] && residuals.at(e) > 0) {
+          visited[v] = true;
+          parent[v]  = u; // Record the path
+          queue.push(v);
+        }
+      }
+    }
+    return parent;
+  }
+
+  flow bottleneck(const vertex &s, const vertex &t, capacities &residuals, path &parent) {
+    flow b = std::numeric_limits<flow>::max();
+    for (auto v = t; v != s; v = parent.at(v)) {
+      auto u = parent.at(v);
+      b = std::min(b, residuals.at(edge(u, v)));
+    }
+    return b;
   }
 };
 }  // namespace rondo

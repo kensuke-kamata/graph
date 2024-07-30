@@ -171,3 +171,25 @@ The algorithm selects edges in increasing order of weight, ensuring that no cycl
 
 **Computational Complexity**
 - Using a priority queue leads to a complexity of $O((V+E)\log V)$, where V is the number of vertices and E is the number of edges.
+
+### Max-Flow
+The Ford-Fulkerson method is an algorithm for solving the maximum flow problem in network flow analysis. It utilizes DFS to repeatedly find augmenting paths in the residual network, thereby increasing the flow until the maximum flow is achieved. Conversely, the Edmonds-Karp method uses BFS to find augmenting paths.
+
+**Initialization**
+- Initialize the residual network, which represents the capacity of each edge. Initially, the capacities in the residual network are the same as those in the original network.
+
+**Finding Augmenting Paths**
+- Search for augmenting paths from the source to the sink (DFS or BFS).
+
+**Calculating Bottleneck Capacity**
+- Identify the edge with the smallest capacity on the discovered path, and consider this capacity as the bottleneck capacity.
+
+**Updating the Flow**
+- For each edge on the path, decrease its capacity by the bottleneck value and increase the capacity of the reverse edge. This updates the residual network.
+
+**Termination Condition**
+- The algorithm terminates when no more augmenting paths can be found.
+
+**Computational Complexity**
+- The performance of Ford-Fulkerson using depth-first search is $O(E \times mf)$, where $mf$ is the maximum flow.
+- The performance of Edmonds-Karp using breadth-first search is $O(V \times E)$, where $V$ is the number of vertices and $E$ is the number of edges.
